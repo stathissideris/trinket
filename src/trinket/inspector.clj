@@ -21,6 +21,9 @@
 (defn set-bounds! [^JComponent c [[x y] [w h]]]
   (.setBounds c x y w h))
 
+(defn grow-bounds [[[x y] [w h]] d]
+  [[(- x d) (- y d)] [(+ w (* 2 d)) (+ h (* 2 d))]])
+
 (defmacro save-transform [g & body]
   `(let [g#  ~g
          tr# (.getTransform ^Graphics2D g#)]
@@ -33,7 +36,7 @@
   ([^JComponent what ^Graphics2D g [^int x ^int y :as pos] size]
    (save-transform
     g
-    (.validate what)
+    ;;(.validate what)
     (set-bounds! what [pos size])
     (.translate g x y)
     (.paint what g))))
@@ -82,3 +85,8 @@
       (.add (JScrollPane. tree))
       (.setSize 400 600)
       (.setVisible true))))
+
+
+(comment
+  (inspect-tree {:a 20 :b 30})
+  )
