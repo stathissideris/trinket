@@ -1,114 +1,58 @@
 (ns trinket.inspector
   (:import
-   [java.awt Toolkit BorderLayout Font Color]
-   [java.awt.event ActionEvent ActionListener KeyListener]
+   [java.awt Graphics2D Toolkit BorderLayout Font Color]
+   [java.awt.event ActionEvent ActionListener KeyListener KeyEvent]
    [java.awt.datatransfer StringSelection]
-   [javax.swing UIManager ImageIcon]
+   [javax.swing JComponent ImageIcon]
    [javax.swing.tree TreeModel TreeCellRenderer DefaultTreeCellRenderer]
    [javax.swing.table TableModel AbstractTableModel]
    [javax.swing JPanel JTree JTable JScrollPane JFrame JToolBar JButton SwingUtilities JLabel]))
 
-(defn single? [x]
-  (not (coll? x)))
-
-(defn collection-tag [x]
-  (cond
-   (map-entry? x) :entry
-   (instance? java.util.Map x) :seqable
-   (instance? java.util.Set x) :seqable
-   (sequential? x) :seq
-   (instance? clojure.lang.Seqable x) :seqable
-   :else :single))
-
-(defmulti is-leaf collection-tag)
-(defmulti get-child (fn [parent index] (collection-tag parent)))
-(defmulti get-child-count collection-tag)
-
-(defmethod is-leaf :default [node]
-  (single? node))
-(defmethod get-child :default [parent index]
-  (nth parent index))
-(defmethod get-child-count :default [parent]
-  (count parent))
-
-(defmethod is-leaf :entry [e]
-  (is-leaf (val e)))
-(defmethod get-child :entry [e index]
-  (get-child (val e) index))
-(defmethod get-child-count :entry [e]
-  (count (val e)))
-
-(defmethod is-leaf :seqable [parent]
-  false)
-(defmethod get-child :seqable [parent index]
-  (nth (seq parent) index))
-(defmethod get-child-count :seqable [parent]
-  (count (seq parent)))
-
-(defn tree-model [data]
-  (proxy [TreeModel] []
-    (getRoot [] data)
-    (addTreeModelListener [treeModelListener])
-    (getChild [parent index]
-      (get-child parent index))
-    (getChildCount [parent]
-       (get-child-count parent))
-    (isLeaf [node]
-      (is-leaf node))
-    (valueForPathChanged [path newValue])
-    (getIndexOfChild [parent child]
-      -1)
-    (removeTreeModelListener [treeModelListener])))
-
-
-(defn open-bracket [x]
-  (cond (map? x) "{"
-        (set? x) "#{"
-        (vector? x) "["
-        (list? x) "("
-        :else "("))
-
-(defn tree-string [{:keys [value expanded]}]
-  (cond (map-entry? value)
-        (if expanded
-          (str (pr-str (key value)) " " (open-bracket (val value)))
-          (str (pr-str (key value)) " " (pr-str (val value))))
-
-        expanded
-        (open-bracket value)
-
-        :else
-        (pr-str value)))
-
+(set! *warn-on-reflection* true)
 
 (def default-font-size 11)
 (def font-size (atom default-font-size))
+(def selection-background (Color/decode "0xb4d9fc"))
 
-(defn tree-renderer [tree]
-  (doto tree
-    (.setRowHeight (int (* 2 @font-size)))
-    (-> .getUI (.setRightChildIndent (* 0.6 @font-size))))
-  (let [label (doto (JLabel.)
-                (.setFont (Font. "Monaco" Font/PLAIN @font-size)))]
-    (add-watch font-size :renderer
-               (fn [_ _ _ size]
-                 (.setFont label (Font. "Monaco" Font/PLAIN size))
-                 (-> tree .getUI (.setRightChildIndent (* 0.6 size)))
-                 (doto tree
-                   (.setRowHeight (int (* 2 size)))
-                   (.repaint))))
-    (proxy [DefaultTreeCellRenderer] []
-      (getTreeCellRendererComponent [tree value selected expanded leaf row has-focus]
-        (if (or has-focus selected)
-          (doto label
-            (.setOpaque true)
-            (.setBackground (Color/decode "0xb4d9fc")))
-          (doto label
-            (.setOpaque false)
-            (.setBackground (Color/WHITE))))
-        (doto label
-          (.setText (tree-string {:value    value
-                                  :expanded expanded})))))))
+(defn ideal-size [^JComponent c]
+  (let [ps (.getPreferredSize c)]
+    [(.getWidth ps) (.getHeight ps)]))
+
+(defn set-bounds! [^JComponent c [[x y] [w h]]]
+  (.setBounds c x y w h))
+
+(defmacro save-transform [g & body]
+  `(let [g#  ~g
+         tr# (.getTransform ^Graphics2D g#)]
+     ~@body
+     (.setTransform g# tr#)))
+
+(defn- paint-at
+  ([^JComponent what ^Graphics2D g pos]
+   (paint-at what g pos (ideal-size what)))
+  ([^JComponent what ^Graphics2D g [^int x ^int y :as pos] size]
+   (save-transform
+    g
+    (.validate what)
+    (set-bounds! what [pos size])
+    (.translate g x y)
+    (.paint what g))))
+
+(defn- paint-tree [^JPanel this ^Graphics2D g ^JLabel label]
+  ;;(.drawLine g 0 0 (.getWidth this) (.getHeight this))
+  (paint-at label g [50 150]))
+
+(defn- tree-inspector
+  [data]
+  (let [^JLabel label (doto (JLabel.)
+                        (.setFont (Font. "Monaco" Font/PLAIN @font-size))
+                        (.setText (pr-str data))
+                        (.setOpaque true)
+                        (.setBackground selection-background))]
+   (proxy [JPanel] []
+     (paintComponent [^Graphics2D g]
+       (#'paint-tree this g label)))))
+
 
 (defn ->clipboard [s]
   (-> (Toolkit/getDefaultToolkit)
@@ -116,9 +60,9 @@
       (.setContents (StringSelection. s) nil))
   s)
 
-(defn key-listener [tree]
+(defn key-listener [^JTree tree]
   (proxy [KeyListener] []
-    (keyPressed [e]
+    (keyPressed [^KeyEvent e]
       (condp = (.getKeyChar e)
         \c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
         \0 (reset! font-size default-font-size)
@@ -130,17 +74,11 @@
 
 
 (defn inspect-tree
-  "creates a graphical (Swing) inspector on the supplied hierarchical data"
-  {:added "1.0"}
   [data]
-  (let [tree (JTree. (tree-model data))]
-    (UIManager/put "Tree.expandedIcon" (ImageIcon.))
-    (UIManager/put "Tree.collapsedIcon" (ImageIcon.))
+  (let [^JTree tree (tree-inspector data)]
     (doto tree
-      (.setFont (Font. "Monaco" Font/PLAIN 11))
-      (.setCellRenderer (tree-renderer tree))
       (.addKeyListener (key-listener tree)))
-    (doto (JFrame. "Clojure Inspector")
+    (doto (JFrame. "Trinket tree inspector")
       (.add (JScrollPane. tree))
       (.setSize 400 600)
       (.setVisible true))))
