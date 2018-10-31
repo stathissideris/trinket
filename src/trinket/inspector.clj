@@ -6,8 +6,10 @@
    [javax.swing JComponent ImageIcon]
    [javax.swing.tree TreeModel TreeCellRenderer DefaultTreeCellRenderer]
    [javax.swing.table TableModel AbstractTableModel]
-   [javax.swing JPanel JTree JTable JScrollPane JFrame JToolBar JButton SwingUtilities JLabel]))
+   [javax.swing JPanel JTree JTable JScrollPane JFrame JToolBar JButton SwingUtilities JLabel])
+  (:require [clojure.pprint :as pp]))
 
+(set! *print-length* 100)
 (set! *warn-on-reflection* true)
 
 (def default-font-size 11)
@@ -43,7 +45,7 @@
        (set-bounds! this bounds)
        (.translate g x y)
        (.paint this g)
-       bounds)))
+       {:bounds bounds})))
   (ideal-size [this]
     (let [ps (.getPreferredSize this)]
       {:w (.getWidth ps) :h (.getHeight ps)})))
@@ -56,7 +58,7 @@
 
 (defrecord Text [text selected]
   Component
-  (paint-at [_ g bounds]
+  (paint-at [this g bounds]
     (.setText text-stamp text)
     (if selected
       (doto text-stamp
@@ -64,8 +66,8 @@
         (.setBackground selection-background))
       (doto text-stamp
         (.setOpaque false)))
-    (paint-at text-stamp g bounds))
-  (ideal-size [_]
+    (merge this (paint-at text-stamp g bounds)))
+  (ideal-size [this]
     (.setText text-stamp text)
     (ideal-size text-stamp)))
 
@@ -75,14 +77,22 @@
 (defn right-of [{:keys [x y w]}]
   {:x (+ x (or w 0)) :y y})
 
-(defrecord Horizontal [children]
-  Component
-  (paint-at [this g {:keys [x y] :as bounds}]
+(defn linear-arrange [parent children next-fn g {:keys [x y] :as bounds}]
+  (let [new-children (transient [])]
     (doall
      (reduce (fn [bounds child]
-               (paint-at child g (right-of bounds)))
+               (let [updated (paint-at child g (next-fn bounds))]
+                 (conj! new-children updated)
+                 (:bounds updated)))
              bounds children))
-    (merge {:x x :y y} (ideal-size this)))
+    (merge parent
+           {:children (persistent! new-children)
+            :bounds   (merge {:x x :y y} (ideal-size parent))})))
+
+(defrecord Horizontal [children]
+  Component
+  (paint-at [this g bounds]
+    (linear-arrange this children right-of g bounds))
   (ideal-size [_]
     (let [ideal-children (map ideal-size children)]
      {:w (apply + (map :w ideal-children))
@@ -94,11 +104,7 @@
 (defrecord Vertical [children]
   Component
   (paint-at [this g {:keys [x y] :as bounds}]
-    (doall
-     (reduce (fn [bounds child]
-               (paint-at child g (below-of bounds)))
-             bounds children))
-    (merge {:x x :y y} (ideal-size this)))
+    (linear-arrange this children below-of g bounds))
   (ideal-size [_]
     (let [ideal-children (map ideal-size children)]
      {:w (apply max (map :w ideal-children))
