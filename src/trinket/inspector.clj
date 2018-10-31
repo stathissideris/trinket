@@ -7,7 +7,8 @@
    [javax.swing.tree TreeModel TreeCellRenderer DefaultTreeCellRenderer]
    [javax.swing.table TableModel AbstractTableModel]
    [javax.swing JPanel JTree JTable JScrollPane JFrame JToolBar JButton SwingUtilities JLabel])
-  (:require [clojure.pprint :as pp]))
+  (:require [clojure.pprint :as pp]
+            [clojure.string :as str]))
 
 (set! *print-length* 100)
 (set! *warn-on-reflection* true)
@@ -74,6 +75,20 @@
 (defn text [s]
   (->Text s false))
 
+(extend-type String
+  Component
+  (paint-at [this g bounds]
+    (paint-at (text this) g bounds))
+  (ideal-size [this]
+    (ideal-size (text this))))
+
+(extend-type clojure.lang.Keyword
+  Component
+  (paint-at [this g bounds]
+    (paint-at (text (name this)) g bounds))
+  (ideal-size [this]
+    (ideal-size (text (name this)))))
+
 (defn right-of [{:keys [x y w]}]
   {:x (+ x (or w 0)) :y y})
 
@@ -116,19 +131,49 @@
    :w (+ w (* 2 d))
    :h (+ h (* 2 d))})
 
+(defn- right-pad [^String s length]
+  (str s (apply str (repeat (- length (.length s)) " "))))
+
+(defn- update-vals [m fun]
+  (reduce-kv (fn [m k v]
+               (assoc m k (fun v)))
+             {} m))
+
+(defn- update-keys [m fun]
+  (reduce-kv (fn [m k v]
+               (assoc m (fun k) v))
+             {} m))
+
+(defn- data->ui [data]
+  (if (map? data)
+    (let [k->str   (zipmap (keys data)
+                           (map pr-str (keys data)))
+          longest  (apply max (map count (vals k->str)))
+          k->str   (update-vals k->str #(right-pad % longest))
+          last-idx (dec (count data))]
+     (->Vertical
+      (for [[idx [k v]] (map-indexed vector data)]
+        (->Horizontal [(if (zero? idx) "{" " ")
+                       (k->str k) " " (pr-str v)
+                       (if (= idx last-idx) "}" " ")]))))))
+
 (defn- paint-tree [^JPanel this ^Graphics2D g data]
   ;;(.drawLine g 0 0 (.getWidth this) (.getHeight this))
-  (paint-at (->Text (pr-str data) false) g {:x 50 :y 50})
-  (paint-at
-   (->Vertical
-    [(->Horizontal [(text "{")
-                    (text ":a 60")])
-     (->Horizontal [(text " ")
-                    (->Text ":abbbbb 1000" true)])
-     (->Horizontal [(text " ")
-                    (text ":abbbbb 500")
-                    (text "}")])])
-   g {:x 0 :y 0}))
+  ;;(paint-at (->Text (pr-str data) false) g {:x 50 :y 50})
+  (paint-at (data->ui data) g {:x 10 :y 10})
+  (comment
+   (paint-at
+    (->Vertical
+     [(->Horizontal [(text "{")
+                     (text ":a 60")])
+      (->Horizontal [(text " ")
+                     (text ":abbbbb")
+                     (text " ")
+                     (->Text "1000" true)])
+      (->Horizontal [(text " ")
+                     (text ":abbbbb 500")
+                     (text "}")])])
+    g {:x 0 :y 0})))
 
 (defn- tree-inspector
   [data]
@@ -168,6 +213,9 @@
 
 
 (comment
+  (inspect-tree {:a     10
+                 :bbbb  20
+                 :ccccc "This is a test"})
   (inspect-tree {:a     {:inner1 20
                          :inner2 20
                          :inner3 20
