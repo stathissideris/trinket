@@ -160,20 +160,7 @@
 (defn- paint-tree [^JPanel this ^Graphics2D g data]
   ;;(.drawLine g 0 0 (.getWidth this) (.getHeight this))
   ;;(paint-at (->Text (pr-str data) false) g {:x 50 :y 50})
-  (paint-at (data->ui data) g {:x 10 :y 10})
-  (comment
-   (paint-at
-    (->Vertical
-     [(->Horizontal [(text "{")
-                     (text ":a 60")])
-      (->Horizontal [(text " ")
-                     (text ":abbbbb")
-                     (text " ")
-                     (->Text "1000" true)])
-      (->Horizontal [(text " ")
-                     (text ":abbbbb 500")
-                     (text "}")])])
-    g {:x 0 :y 0})))
+  (paint-at (data->ui data nil nil) g {:x 10 :y 10}))
 
 (defn- tree-inspector
   [data]
