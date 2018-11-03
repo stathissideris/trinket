@@ -46,7 +46,7 @@
        (set-bounds! this bounds)
        (.translate g x y)
        (.paint this g)
-       {:bounds bounds})))
+       bounds)))
   (ideal-size [this]
     (let [ps (.getPreferredSize this)]
       {:w (.getWidth ps) :h (.getHeight ps)})))
@@ -85,9 +85,9 @@
 (extend-type clojure.lang.Keyword
   Component
   (paint-at [this g bounds]
-    (paint-at (text (name this)) g bounds))
+    (paint-at (text (str this)) g bounds))
   (ideal-size [this]
-    (ideal-size (text (name this)))))
+    (ideal-size (text (str this)))))
 
 (defn right-of [{:keys [x y w]}]
   {:x (+ x (or w 0)) :y y})
@@ -98,11 +98,11 @@
      (reduce (fn [bounds child]
                (let [updated (paint-at child g (next-fn bounds))]
                  (conj! new-children updated)
-                 (:bounds updated)))
+                 updated))
              bounds children))
     (merge parent
-           {:children (persistent! new-children)
-            :bounds   (merge {:x x :y y} (ideal-size parent))})))
+           (merge {:x x :y y} (ideal-size parent))
+           {:children (persistent! new-children)})))
 
 (defrecord Horizontal [children]
   Component
@@ -160,7 +160,7 @@
 (defn- paint-tree [^JPanel this ^Graphics2D g data]
   ;;(.drawLine g 0 0 (.getWidth this) (.getHeight this))
   ;;(paint-at (->Text (pr-str data) false) g {:x 50 :y 50})
-  (paint-at (data->ui data nil nil) g {:x 10 :y 10}))
+  (pp/pprint (paint-at (data->ui data) g {:x 10 :y 10})))
 
 (defn- tree-inspector
   [data]
