@@ -67,8 +67,13 @@
   (layout [this]
     (merge this (ideal-size this))))
 
-(defn text [s]
-  (assoc (->Text) ::text s))
+(defn text [x]
+  (cond (string? x)
+        (assoc (->Text) ::text x)
+        (map? x)
+        (merge (->Text) x)
+        :else
+        (assoc (->Text) ::text (str x))))
 
 (defn right-of [{::keys [x y w]}]
   {::x (+ x (or w 0)) ::y y})

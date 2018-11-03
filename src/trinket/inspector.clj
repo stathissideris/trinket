@@ -25,22 +25,43 @@
                (assoc m (fun k) v))
              {} m))
 
-(defn- data->ui [data]
-  (if (map? data)
-    (let [k->str   (zipmap (keys data)
-                           (map pr-str (keys data)))
-          longest  (apply max (map count (vals k->str)))
-          k->str   (update-vals k->str #(right-pad % longest))
-          last-idx (dec (count data))]
-      (ui/map->Vertical
-       {::ui/x 15 ::ui/y 15
-        ::ui/children
-        (for [[idx [k v]] (map-indexed vector data)]
+(defn collection-tag [x]
+  (cond
+    (map? x)                           :map
+    (set? x)                           :set
+    (vector? x)                        :vector
+    (list? x)                          :list
+    (instance? clojure.lang.LazySeq x) :lazy-seq
+    :else                              :atom))
+
+(defmulti data->ui (fn [data path options] (collection-tag data)))
+
+(defmethod data->ui :map
+  [data path {:keys [expanded] :as options}]
+  (let [k->str   (zipmap (keys data)
+                         (map pr-str (keys data)))
+        longest  (apply max (map count (vals k->str)))
+        k->str   (update-vals k->str #(right-pad % longest))
+        last-idx (dec (count data))]
+    (ui/map->Vertical
+     {::ui/x 15 ::ui/y 15
+      ::ui/children
+      (for [[idx [k v]] (map-indexed vector data)]
+        (let [key-path (conj path k 0)
+              val-path (conj path k 1)]
           (ui/map->Horizontal
            {::ui/children
             [(if (zero? idx) (ui/text "{") (ui/text " "))
-             (ui/text (k->str k)) (ui/text " ") (ui/text (pr-str v))
-             (if (= idx last-idx) (ui/text "}") (ui/text " "))]}))}))))
+             (if (get expanded key-path)
+               (data->ui k key-path options)
+               (-> (ui/text (k->str k))
+                   (assoc ::path key-path)))
+             (ui/text " ")
+             (if (get expanded val-path)
+               (data->ui v val-path options)
+               (-> (ui/text (pr-str v))
+                   (assoc ::path val-path)))
+             (if (= idx last-idx) (ui/text "}") (ui/text " "))]})))})))
 
 (defn- paint-tree [this g data]
   ;;(.drawLine g 0 0 (.getWidth this) (.getHeight this))
@@ -48,7 +69,7 @@
 
 (defn- tree-inspector
   [data]
-  (reset! current-ui (ui/layout (data->ui data)))
+  (reset! current-ui (ui/layout (data->ui data [] {})))
   (proxy [JPanel] []
     (paintComponent [g]
       (#'paint-tree this g data))))
@@ -63,8 +84,9 @@
 (defn mouse-listener []
   (proxy [MouseListener] []
     (mouseClicked [^MouseEvent e]
-      (if-let [match (ui/component-at-point {::ui/x (.getX e) ::ui/y (.getY e)}
-                                            @current-ui)]
+      (if-let [match (ui/component-at-point
+                      {::ui/x (.getX e) ::ui/y (.getY e)}
+                      @current-ui)]
         (println "You clicked on" (pr-str match))))
     (mouseEntered [e])
     (mouseExited [e])
@@ -117,6 +139,10 @@
               :ccccc "This is a test"}))
   (inspect-tree {:a     10000
                  :bbbb  20
+                 :ccccc "This is a test"})
+  (inspect-tree {:a     10000
+                 :bbbb  {:gg 88
+                         :ffff 10}
                  :ccccc "This is a test"})
   (inspect-tree {:a     {:inner1 20
                          :inner2 20
