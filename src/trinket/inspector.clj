@@ -1,7 +1,8 @@
 (ns trinket.inspector
   (:require [trinket.ui :as ui]
             [clojure.pprint :as pp]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [clojure.zip :as zip])
   (:import [java.awt Toolkit]
            [java.awt.event KeyListener KeyEvent MouseListener MouseEvent]
            [java.awt.datatransfer StringSelection]
@@ -61,8 +62,14 @@
 
 (defn mouse-listener []
   (proxy [MouseListener] []
-    (mouseClicked [event]
-      ())))
+    (mouseClicked [^MouseEvent e]
+      (if-let [match (ui/component-at-point {::ui/x (.getX e) ::ui/y (.getY e)}
+                                            @current-ui)]
+        (println "You clicked on" (pr-str match))))
+    (mouseEntered [e])
+    (mouseExited [e])
+    (mousePressed [e])
+    (mouseReleased [e])))
 
 (defn key-listener [^JPanel panel]
   (proxy [KeyListener] []
@@ -81,7 +88,8 @@
   [data]
   (let [^JPanel tree (tree-inspector data)]
     (doto tree
-      (.addKeyListener (key-listener tree)))
+      (.addKeyListener (key-listener tree))
+      (.addMouseListener (mouse-listener)))
     (doto (JFrame. "Trinket tree inspector")
       (.add (JScrollPane. tree))
       (.setSize 400 600)

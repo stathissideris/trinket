@@ -1,6 +1,7 @@
 (ns trinket.ui
   (:import [java.awt Graphics2D Color Font]
-           [javax.swing JComponent JLabel]))
+           [javax.swing JComponent JLabel])
+  (:require [clojure.zip :as zip]))
 
 (def default-font-size 11)
 (def font-size (atom default-font-size))
@@ -112,3 +113,21 @@
    ::y (- y d)
    ::w (+ w (* 2 d))
    ::h (+ h (* 2 d))})
+
+(defn zipper [elem]
+  (zip/zipper ::children ::children #(assoc %1 ::children %2) elem))
+
+(defn point-within? [{px ::x py ::y} {::keys [x y w h]}]
+  (and (<= x px (+ x w))
+       (<= y py (+ y h))))
+
+(defn component-at-point [point ui]
+  (let [z       (zipper ui)
+        matches (transient [])]
+    (loop [loc z]
+      (if (zip/end? loc)
+        (last (persistent! matches))
+        (do
+          (when (point-within? point (zip/node loc))
+            (conj! matches (zip/node loc)))
+          (recur (zip/next loc)))))))
