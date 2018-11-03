@@ -21,11 +21,11 @@
   (layout [this]))
 
 
-(defn set-bounds! [^JComponent c {:keys [x y w h]}]
+(defn set-bounds! [^JComponent c {::keys [x y w h]}]
   (.setBounds c x y w h))
 
 
-(defn paint-at! [^JComponent component ^Graphics2D g {:keys [^int x ^int y w h] :as bounds}]
+(defn paint-at! [^JComponent component ^Graphics2D g {::keys [^int x ^int y w h] :as bounds}]
   (assert x)
   (assert y)
   (assert w)
@@ -42,18 +42,18 @@
   Component
   (ideal-size [this]
     (let [ps (.getPreferredSize this)]
-      {:w (.getWidth ps) :h (.getHeight ps)})))
+      {::w (.getWidth ps) ::h (.getHeight ps)})))
 
 (def ^JLabel text-stamp (doto (JLabel.)
                           (.setFont (Font. "Monaco" Font/PLAIN @font-size))
                           (.setOpaque true)
                           (.setBackground selection-background)))
 
-(defrecord Text [text]
+(defrecord Text []
   Component
   (paint! [this g]
-    (.setText text-stamp text)
-    (if (:selected this)
+    (.setText text-stamp (::text this))
+    (if (::selected this)
       (doto text-stamp
         (.setOpaque true)
         (.setBackground selection-background))
@@ -61,54 +61,54 @@
         (.setOpaque false)))
     (paint-at! text-stamp g this))
   (ideal-size [this]
-    (.setText text-stamp text)
+    (.setText text-stamp (::text this))
     (ideal-size text-stamp))
   (layout [this]
     (merge this (ideal-size this))))
 
 (defn text [s]
-  (->Text s))
+  (assoc (->Text) ::text s))
 
-(defn right-of [{:keys [x y w]}]
-  {:x (+ x (or w 0)) :y y})
+(defn right-of [{::keys [x y w]}]
+  {::x (+ x (or w 0)) ::y y})
 
-(defn linear-arrange [children {:keys [x y] :as parent} next-pos]
-  (let [first-c (-> children first (assoc :x x :y y) layout)]
+(defn linear-arrange [children {::keys [x y] :as parent} next-pos]
+  (let [first-c (-> children first (assoc ::x x ::y y) layout)]
     (reduce (fn [children child]
               (conj children (layout (merge child (next-pos (last children))))))
             [first-c] (rest children))))
 
-(defrecord Horizontal [children]
+(defrecord Horizontal []
   Component
   (paint! [this g]
-    (doseq [c children] (paint! c g)))
+    (doseq [c (::children this)] (paint! c g)))
   (ideal-size [this]
     (layout this))
-  (layout [{:keys [x y children] :as this}]
+  (layout [{::keys [x y children] :as this}]
     (let [new-children (linear-arrange children this right-of)]
       (assoc this
-             :children new-children
-             :w (apply + (map :w new-children))
-             :h (apply max (map :h new-children))))))
+             ::children new-children
+             ::w (apply + (map ::w new-children))
+             ::h (apply max (map ::h new-children))))))
 
-(defn below-of [{:keys [x y h]}]
-  {:x x :y (+ y (or h 0))})
+(defn below-of [{::keys [x y h]}]
+  {::x x ::y (+ y (or h 0))})
 
-(defrecord Vertical [children]
+(defrecord Vertical []
   Component
   (paint! [this g]
-    (doseq [c children] (paint! c g)))
+    (doseq [c (::children this)] (paint! c g)))
   (ideal-size [this]
     (layout this))
-  (layout [this]
+  (layout [{::keys [x y children] :as this}]
     (let [new-children (linear-arrange children this below-of)]
       (assoc this
-             :children new-children
-             :w (apply max (map :w new-children))
-             :h (apply + (map :h new-children))))))
+             ::children new-children
+             ::w (apply max (map ::w new-children))
+             ::h (apply + (map ::h new-children))))))
 
-(defn grow-bounds [{:keys [x y w h]} d]
-  {:x (- x d)
-   :y (- y d)
-   :w (+ w (* 2 d))
-   :h (+ h (* 2 d))})
+(defn grow-bounds [{::keys [x y w h]} d]
+  {::x (- x d)
+   ::y (- y d)
+   ::w (+ w (* 2 d))
+   ::h (+ h (* 2 d))})
