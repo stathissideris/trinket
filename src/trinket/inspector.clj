@@ -10,7 +10,7 @@
 
 (set! *warn-on-reflection* true)
 
-(def current-ui (atom nil))
+(defonce current-ui (atom nil))
 
 (defn- right-pad [^String s length]
   (str s (apply str (repeat (- length (.length s)) " "))))
@@ -37,7 +37,7 @@
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
 (defmethod data->ui :map
-  [data path {:keys [expanded] :as options}]
+  [data path {:keys [cursor expanded] :as options}]
   (let [k->str   (zipmap (keys data)
                          (map pr-str (keys data)))
         longest  (apply max (map count (vals k->str)))
@@ -55,21 +55,25 @@
              (if (get expanded key-path)
                (data->ui k key-path options)
                (-> (ui/text (k->str k))
-                   (assoc ::path key-path)))
+                   (assoc ::path key-path ::ui/selected (= cursor key-path))))
              (ui/text " ")
              (if (get expanded val-path)
                (data->ui v val-path options)
                (-> (ui/text (pr-str v))
-                   (assoc ::path val-path)))
+                   (assoc ::path val-path ::ui/selected (= cursor val-path))))
              (if (= idx last-idx) (ui/text "}") (ui/text " "))]})))})))
 
 (defn- paint-tree [this g data]
   ;;(.drawLine g 0 0 (.getWidth this) (.getHeight this))
   (ui/paint! @current-ui g))
 
+(defn- set-data! [data options]
+  (reset! current-ui (ui/layout (data->ui data [] options)))
+  (.repaint ^JFrame (last (java.awt.Frame/getFrames)))) ;;TODO do properly
+
 (defn- tree-inspector
   [data]
-  (reset! current-ui (ui/layout (data->ui data [] {})))
+  (set-data! data {})
   (proxy [JPanel] []
     (paintComponent [g]
       (#'paint-tree this g data))))
@@ -144,6 +148,14 @@
                  :bbbb  {:gg 88
                          :ffff 10}
                  :ccccc "This is a test"})
+
+  (set-data! {:a     10000
+              :bbbb  {:gg 88
+                      :ffff 10}
+              :ccccc "This is a very important test"}
+             {:expanded #{[:bbbb 1]}
+              :cursor   [:bbbb 1 :gg 1]})
+
   (inspect-tree {:a     {:inner1 20
                          :inner2 20
                          :inner3 20
