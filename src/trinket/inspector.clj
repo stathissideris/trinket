@@ -10,7 +10,8 @@
 
 (set! *warn-on-reflection* true)
 
-(defonce current-ui (atom nil))
+(defonce current-data (atom nil))
+(defonce current-options (atom nil))
 
 (defn- right-pad [^String s length]
   (str s (apply str (repeat (- length (.length s)) " "))))
@@ -47,8 +48,8 @@
      {::ui/x 15 ::ui/y 15
       ::ui/children
       (for [[idx [k v]] (map-indexed vector data)]
-        (let [key-path (conj path k 0)
-              val-path (conj path k 1)]
+        (let [key-path (conj path k ::key)
+              val-path (conj path k ::val)]
           (ui/map->Horizontal
            {::ui/children
             [(if (zero? idx) (ui/text "{") (ui/text " "))
@@ -63,41 +64,25 @@
                    (assoc ::path val-path ::ui/selected (= cursor val-path))))
              (if (= idx last-idx) (ui/text "}") (ui/text " "))]})))})))
 
-(defn- paint-tree [this g data]
-  ;;(.drawLine g 0 0 (.getWidth this) (.getHeight this))
-  (ui/paint! @current-ui g))
-
-(defn- set-data! [data options]
-  (reset! current-ui (ui/layout (data->ui data [] options)))
-  (.repaint ^JFrame (last (java.awt.Frame/getFrames)))) ;;TODO do properly
-
-(defn- tree-inspector
-  [data]
-  (set-data! data {})
-  (proxy [JPanel] []
-    (paintComponent [g]
-      (#'paint-tree this g data))))
-
-
 (defn ->clipboard [s]
   (-> (Toolkit/getDefaultToolkit)
       .getSystemClipboard
       (.setContents (StringSelection. s) nil))
   s)
 
-(defn mouse-listener []
+(defn mouse-listener [ui-atom]
   (proxy [MouseListener] []
     (mouseClicked [^MouseEvent e]
       (if-let [match (ui/component-at-point
                       {::ui/x (.getX e) ::ui/y (.getY e)}
-                      @current-ui)]
+                      @ui-atom)]
         (println "You clicked on" (pr-str match))))
     (mouseEntered [e])
     (mouseExited [e])
     (mousePressed [e])
     (mouseReleased [e])))
 
-(defn key-listener [^JPanel panel]
+(defn key-listener []
   (proxy [KeyListener] []
     (keyPressed [^KeyEvent e]
       (condp = (.getKeyChar e)
@@ -109,17 +94,42 @@
     (keyReleased [e])
     (keyTyped [e])))
 
+(defrecord Inspector [data-atom options-atom ui-atom frame])
 
-(defn inspect-tree
-  [data]
-  (let [^JPanel tree (tree-inspector data)]
-    (doto tree
-      (.addKeyListener (key-listener tree))
-      (.addMouseListener (mouse-listener)))
-    (doto (JFrame. "Trinket tree inspector")
-      (.add (JScrollPane. tree))
-      (.setSize 400 600)
-      (.setVisible true))))
+(defn- set-data! [{:keys [data-atom] :as inspector} data]
+  (reset! data-atom data))
+
+(defn- set-options! [{:keys [options-atom] :as inspector} options]
+  (reset! options-atom options))
+
+(defn inspect
+  ([data]
+   (inspect data {}))
+  ([data options]
+   (let [data-atom    (atom data)
+         options-atom (atom options)
+         ui-atom      (atom (ui/layout (data->ui data [] options)))
+         ^JPanel tree (doto (proxy [JPanel] []
+                              (paintComponent [g]
+                                (ui/paint! @ui-atom g)))
+                        (.addKeyListener (key-listener))
+                        (.addMouseListener (mouse-listener ui-atom)))
+         frame        (doto (JFrame. "Trinket tree inspector")
+                        (.add (JScrollPane. tree))
+                        (.setSize 400 600)
+                        (.setVisible true))]
+
+     (add-watch data-atom ::inspector-ui
+                (fn [_ _ _ data]
+                  (swap! ui-atom (fn [_] (ui/layout (data->ui data [] @options-atom))))
+                  (.repaint frame)))
+
+     (add-watch options-atom ::inspector-ui
+                (fn [_ _ _ options]
+                  (swap! ui-atom (fn [_] (ui/layout (data->ui @data-atom [] options))))
+                  (.repaint frame)))
+
+     (->Inspector data-atom options-atom ui-atom frame))))
 
 
 (comment
@@ -141,32 +151,33 @@
    (data->ui {:a     10
               :bbbb  20
               :ccccc "This is a test"}))
-  (inspect-tree {:a     10000
-                 :bbbb  20
-                 :ccccc "This is a test"})
-  (inspect-tree {:a     10000
-                 :bbbb  {:gg 88
-                         :ffff 10}
-                 :ccccc "This is a test"})
-
-  (set-data! {:a     10000
+  (inspect {:a     10000
+            :bbbb  20
+            :ccccc "This is a test"})
+  (def ins
+    (inspect {:a     10000
               :bbbb  {:gg 88
                       :ffff 10}
-              :ccccc "This is a very important test"}
-             {:expanded #{[:bbbb 1]}
-              :cursor   [:bbbb 1 :gg 1]})
+              :ccccc "This is a test"}))
 
-  (inspect-tree {:a     {:inner1 20
-                         :inner2 20
-                         :inner3 20
-                         :inner4 20
-                         :inner5 20
-                         :inner6 20}
-                 :bbbb  {:inner1 20
-                         :inner2 20
-                         :inner3 20
-                         :inner4 20
-                         :inner5 20
-                         :inner6 20}
-                 :ccccc "This is a test"})
+  (set-data! ins {:a     10000
+                  :bbbb  {:gg 88
+                          :ffff 10}
+                  :ccccc "This is a very important test"})
+  (set-options! ins {:expanded #{[:bbbb ::val]}
+                     :cursor   [:bbbb ::val :gg ::val]})
+
+  (inspect {:a     {:inner1 20
+                    :inner2 20
+                    :inner3 20
+                    :inner4 20
+                    :inner5 20
+                    :inner6 20}
+            :bbbb  {:inner1 20
+                    :inner2 20
+                    :inner3 20
+                    :inner4 20
+                    :inner5 20
+                    :inner6 20}
+            :ccccc "This is a test"})
   )
