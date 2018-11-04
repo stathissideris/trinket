@@ -32,6 +32,7 @@
     (set? x)                           :set
     (vector? x)                        :vector
     (list? x)                          :list
+    (string? x)                        :list
     (instance? clojure.lang.LazySeq x) :lazy-seq
     :else                              :atom))
 
