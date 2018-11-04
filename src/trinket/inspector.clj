@@ -37,7 +37,7 @@
 
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
-(defn sequential->ui [data path {::keys [cursor expanded opening closing] :as options}]
+(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str] :as options}]
   (let [last-idx (dec (count data))]
     (ui/map->Vertical
      {::ui/x        15 ;;overwritten when it's nested
@@ -51,7 +51,7 @@
             [ ;;opening
              (if (zero? idx)
                (-> (ui/text opening) (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
-               (ui/text " "))
+               (ui/text (or indent-str " ")))
 
              ;;value
              (if (get expanded value-path)
@@ -72,6 +72,10 @@
 (defmethod data->ui :list
   [data path options]
   (sequential->ui data path (assoc options ::opening "(" ::closing ")")))
+
+(defmethod data->ui :set
+  [data path options]
+  (sequential->ui data path (assoc options ::opening "#{" ::closing "}" ::indent-str "  ")))
 
 (defmethod data->ui :map
   [data path {::keys [cursor expanded] :as options}]
@@ -254,6 +258,9 @@
                       :ffff 10}
               :ee    ["this is a vec" 1000 :foo "tt"]
               :list  (list "this is a list" 4000 :foo "tt")
+              :set  #{"sets are nice too"
+                      "sets are nice 3"
+                      "sets are nice 4"}
               :ccccc "This is a test"}))
 
   (set-data! ins {:a     10000
