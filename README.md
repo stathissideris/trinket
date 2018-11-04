@@ -1,5 +1,12 @@
 # trinket
 
+## TODO
+
+- [ ] Make closing brace align with the bottom of the last item (see
+      what happens if you expand the last item)
+- [ ] Take into account expansion state when doing layout (see what
+      happens when you expand a key that is a map)
+
 ## How to address both keys and values in nested data structures
 
 ``` clojure

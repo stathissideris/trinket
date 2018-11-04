@@ -254,15 +254,18 @@
               :ccccc "This is a test"}))
 
   (def ins
-    (inspect {:a     10000
-              :bbbb  {:gg 88
-                      :ffff 10}
-              :ee    ["this is a vec" 1000 :foo "tt"]
-              :list  (list "this is a list" 4000 :foo "tt")
-              :set  #{"sets are nice too"
-                      "sets are nice 3"
-                      "sets are nice 4"}
-              :ccccc "This is a test"}))
+    (inspect {:a             10000
+              :bbbb          {:gg 88
+                              :ffff 10}
+              :ee            ["this is a vec" 1000 :foo "tt"]
+              :list          (list "this is a list" 4000 :foo "tt")
+              :set           #{"sets are nice too"
+                               "sets are nice 3"
+                               "sets are nice 4"}
+              {:map "keys"
+               :are "handled"
+               :as  "well!"} "yay!"
+              :ccccc         "This is a test"}))
 
   (set-data! ins {:a     10000
                   :bbbb  {:gg 88
