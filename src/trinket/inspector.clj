@@ -37,6 +37,42 @@
 
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
+(defn sequential->ui [data path {::keys [cursor expanded opening closing] :as options}]
+  (let [last-idx (dec (count data))]
+    (ui/map->Vertical
+     {::ui/x        15 ;;overwritten when it's nested
+      ::ui/y        15
+      ::cursor      (= cursor path)
+      ::ui/children
+      (for [[idx v] (map-indexed vector data)]
+        (let [value-path (conj path idx)]
+          (ui/map->Horizontal
+           {::ui/children
+            [ ;;opening
+             (if (zero? idx)
+               (-> (ui/text opening) (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
+               (ui/text " "))
+
+             ;;value
+             (if (get expanded value-path)
+               (data->ui v value-path options)
+               (cond-> (ui/text (pr-str v))
+                 :always (assoc ::path value-path)
+                 (= cursor value-path) (assoc ::cursor true)))
+
+             ;; closing
+             (if (= idx last-idx)
+               (-> (ui/text closing) (assoc ::path path))
+               (ui/text " "))]})))})))
+
+(defmethod data->ui :vector
+  [data path options]
+  (sequential->ui data path (assoc options ::opening "[" ::closing "]")))
+
+(defmethod data->ui :list
+  [data path options]
+  (sequential->ui data path (assoc options ::opening "(" ::closing ")")))
+
 (defmethod data->ui :map
   [data path {::keys [cursor expanded] :as options}]
   (let [k->str   (zipmap (keys data)
@@ -45,7 +81,7 @@
         k->str   (update-vals k->str #(right-pad % longest))
         last-idx (dec (count data))]
     (ui/map->Vertical
-     {::ui/x        15
+     {::ui/x        15 ;;overwritten when it's nested
       ::ui/y        15
       ::cursor      (= cursor path)
       ::ui/children
@@ -210,6 +246,14 @@
     (inspect {:a     10000
               :bbbb  {:gg 88
                       :ffff 10}
+              :ccccc "This is a test"}))
+
+  (def ins
+    (inspect {:a     10000
+              :bbbb  {:gg 88
+                      :ffff 10}
+              :ee    ["this is a vec" 1000 :foo "tt"]
+              :list  (list "this is a list" 4000 :foo "tt")
               :ccccc "This is a test"}))
 
   (set-data! ins {:a     10000
