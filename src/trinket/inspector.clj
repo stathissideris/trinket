@@ -42,7 +42,7 @@
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str] :as options}]
   (let [last-idx (dec (count data))]
     (ui/map->Vertical
-     {::ui/x        15 ;;overwritten when it's nested
+     {::ui/x        15 ;; overwritten when it's nested
       ::ui/y        15
       ::cursor      (= cursor path)
       ::tag         (collection-tag data)
@@ -53,12 +53,12 @@
            {::ui/children
             [ ;;opening
              (if (zero? idx)
-               (-> (ui/text opening) (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
+               (-> (ui/text opening) (assoc ::path path)) ;; assoc path to allow mouse selection of whole map
                (ui/text (or indent-str " ")))
 
              ;;value
              (if (get expanded value-path)
-               (data->ui v value-path options)
+               (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
                (cond-> (ui/text (pr-str v))
                  :always (assoc
                           ::path value-path
