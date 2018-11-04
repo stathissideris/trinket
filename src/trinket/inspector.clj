@@ -59,7 +59,7 @@
              (if (get expanded value-path)
                (data->ui v value-path options)
                (cond-> (ui/text (pr-str v))
-                 :always (assoc ::path value-path ::index idx)
+                 :always (assoc ::path value-path ::index idx ::tag (collection-tag v))
                  (= cursor value-path) (assoc ::cursor true)))
 
              ;; closing
@@ -92,8 +92,8 @@
       ::cursor      (= cursor path)
       ::ui/children
       (for [[idx [k v]] (map-indexed vector data)]
-        (let [key-path (conj path k ::path/key)
-              val-path (conj path k ::path/val)]
+        (let [key-path (conj path idx ::path/key)
+              val-path (conj path idx ::path/val)]
           (ui/map->Horizontal
            {::ui/children
             [;;opening
@@ -105,7 +105,7 @@
              (if (get expanded key-path)
                (data->ui k key-path options)
                (cond-> (ui/text (k->str k))
-                 :always (assoc ::path key-path ::index idx)
+                 :always (assoc ::path key-path ::index idx ::tag (collection-tag k))
                  (= cursor key-path) (assoc ::cursor true)))
 
              (ui/text " ")
@@ -114,7 +114,7 @@
              (if (get expanded val-path)
                (data->ui v val-path options)
                (cond-> (ui/text (pr-str v))
-                 :always (assoc ::path val-path ::index idx)
+                 :always (assoc ::path val-path ::index idx ::tag (collection-tag v))
                  (= cursor val-path) (assoc ::cursor true)))
 
              ;; closing
@@ -196,7 +196,8 @@
     (println "click on:" (pr-str match))
     (condp = (.getClickCount e)
       1 (swap-options! inspector assoc ::cursor (::path match))
-      2 (toggle-expansion! inspector (::path match))
+      2 (when-not (= :atom (::tag match))
+          (toggle-expansion! inspector (::path match)))
       nil)))
 
 (defn mouse-listener [{:keys [ui-atom] :as inspector}]
