@@ -47,8 +47,9 @@
 
 (def ^JLabel text-stamp (doto (JLabel.)
                           (.setFont (Font. "Monaco" Font/PLAIN @font-size))
-                          (.setOpaque true)
-                          (.setBackground selection-background)))
+                          ;;(.setOpaque true)
+                          ;;(.setBackground selection-background)
+                          ))
 
 (defrecord Text []
   Component
@@ -128,11 +129,20 @@
 
 (defn component-at-point [point ui]
   (let [z       (zipper ui)
-        matches (transient [])]
+        matches (transient [])] ;;we go on until we find the last one
     (loop [loc z]
       (if (zip/end? loc)
         (last (persistent! matches))
         (do
           (when (point-within? point (zip/node loc))
             (conj! matches (zip/node loc)))
+          (recur (zip/next loc)))))))
+
+(defn find-component [ui pred]
+  (let [z (zipper ui)]
+    (loop [loc z]
+      (if (zip/end? loc)
+        nil
+        (if (pred (zip/node loc))
+          (zip/node loc)
           (recur (zip/next loc)))))))

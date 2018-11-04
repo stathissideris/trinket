@@ -3,7 +3,7 @@
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
-  (:import [java.awt Toolkit]
+  (:import [java.awt Toolkit Graphics2D]
            [java.awt.event KeyListener KeyEvent MouseListener MouseEvent]
            [java.awt.datatransfer StringSelection]
            [javax.swing JPanel JFrame JScrollPane]))
@@ -38,14 +38,16 @@
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
 (defmethod data->ui :map
-  [data path {:keys [cursor expanded] :as options}]
+  [data path {::keys [cursor expanded] :as options}]
   (let [k->str   (zipmap (keys data)
                          (map pr-str (keys data)))
         longest  (apply max (map count (vals k->str)))
         k->str   (update-vals k->str #(right-pad % longest))
         last-idx (dec (count data))]
     (ui/map->Vertical
-     {::ui/x 15 ::ui/y 15
+     {::ui/x        15
+      ::ui/y        15
+      ::cursor      (= cursor path)
       ::ui/children
       (for [[idx [k v]] (map-indexed vector data)]
         (let [key-path (conj path k ::key)
@@ -55,14 +57,26 @@
             [(if (zero? idx) (ui/text "{") (ui/text " "))
              (if (get expanded key-path)
                (data->ui k key-path options)
-               (-> (ui/text (k->str k))
-                   (assoc ::path key-path ::ui/selected (= cursor key-path))))
+               (cond-> (ui/text (k->str k))
+                 :always (assoc ::path key-path)
+                 (= cursor key-path) (assoc ::cursor true)))
              (ui/text " ")
              (if (get expanded val-path)
                (data->ui v val-path options)
-               (-> (ui/text (pr-str v))
-                   (assoc ::path val-path ::ui/selected (= cursor val-path))))
+               (cond-> (ui/text (pr-str v))
+                 :always (assoc ::path val-path)
+                 (= cursor val-path) (assoc ::cursor true)))
              (if (= idx last-idx) (ui/text "}") (ui/text " "))]})))})))
+
+(defn paint-cursor [ui ^Graphics2D g]
+  (when-let [match (ui/find-component ui ::cursor)]
+    (let [cursor (ui/grow-bounds match 1)]
+      (doto g
+        (.setColor ui/selection-background)
+        (.fillRect (int (::ui/x cursor))
+                   (int (::ui/y cursor))
+                   (int (::ui/w cursor))
+                   (int (::ui/h cursor)))))))
 
 (defn ->clipboard [s]
   (-> (Toolkit/getDefaultToolkit)
@@ -83,10 +97,10 @@
   (when-let [match (ui/component-at-point
                     {::ui/x (.getX e) ::ui/y (.getY e)}
                     @ui-atom)]
-    (println "click on: " (pr-str match))
+    (println "click on:" (pr-str match))
     (condp = (.getClickCount e)
-      1 (swap-options! inspector assoc :cursor (::path match))
-      2 (swap-options! inspector update :expanded (fnil conj #{}) (::path match)))))
+      1 (swap-options! inspector assoc ::cursor (::path match))
+      2 (swap-options! inspector update ::expanded (fnil conj #{}) (::path match)))))
 
 (defn mouse-listener [{:keys [ui-atom] :as inspector}]
   (proxy [MouseListener] []
@@ -118,8 +132,10 @@
          options-atom (atom options)
          ui-atom      (atom (ui/layout (data->ui data [] options)))
          ^JPanel panel (doto (proxy [JPanel] []
-                              (paintComponent [g]
-                                (ui/paint! @ui-atom g))))
+                               (paintComponent [g]
+                                 (let [ui @ui-atom]
+                                   (#'paint-cursor ui g)
+                                   (ui/paint! ui g)))))
          frame        (doto (JFrame. "Trinket tree inspector")
                         (.add (JScrollPane. panel))
                         (.setSize 400 600))
@@ -176,8 +192,10 @@
                   :bbbb  {:gg 88
                           :ffff 10}
                   :ccccc "This is a very important test"})
-  (set-options! ins {:expanded #{[:bbbb ::val]}
-                     :cursor   [:bbbb ::val :gg ::val]})
+  (set-options! ins {::expanded #{[:bbbb ::val]}
+                     ::cursor [:bbbb ::val]})
+  (set-options! ins {::expanded #{[:bbbb ::val]}
+                     ::cursor   [:bbbb ::val :gg ::val]})
 
   (inspect {:a     {:inner1 20
                     :inner2 20
