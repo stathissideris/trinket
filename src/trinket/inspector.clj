@@ -70,19 +70,33 @@
       (.setContents (StringSelection. s) nil))
   s)
 
-(defn mouse-listener [ui-atom]
+(defn- set-data! [{:keys [data-atom] :as inspector} data]
+  (reset! data-atom data))
+
+(defn- set-options! [{:keys [options-atom] :as inspector} options]
+  (reset! options-atom options))
+
+(defn- swap-options! [{:keys [options-atom] :as inspector} & args]
+  (apply swap! options-atom args))
+
+(defn- mouse-clicked [{:keys [ui-atom] :as inspector} ^MouseEvent e]
+  (when-let [match (ui/component-at-point
+                    {::ui/x (.getX e) ::ui/y (.getY e)}
+                    @ui-atom)]
+    (println "click on: " (pr-str match))
+    (condp = (.getClickCount e)
+      1 (swap-options! inspector assoc :cursor (::path match))
+      2 (swap-options! inspector update :expanded (fnil conj #{}) (::path match)))))
+
+(defn mouse-listener [{:keys [ui-atom] :as inspector}]
   (proxy [MouseListener] []
-    (mouseClicked [^MouseEvent e]
-      (if-let [match (ui/component-at-point
-                      {::ui/x (.getX e) ::ui/y (.getY e)}
-                      @ui-atom)]
-        (println "You clicked on" (pr-str match))))
+    (mouseClicked [e] (#'mouse-clicked inspector e))
     (mouseEntered [e])
     (mouseExited [e])
     (mousePressed [e])
     (mouseReleased [e])))
 
-(defn key-listener []
+(defn key-listener [inspector]
   (proxy [KeyListener] []
     (keyPressed [^KeyEvent e]
       (condp = (.getKeyChar e)
@@ -96,12 +110,6 @@
 
 (defrecord Inspector [data-atom options-atom ui-atom frame])
 
-(defn- set-data! [{:keys [data-atom] :as inspector} data]
-  (reset! data-atom data))
-
-(defn- set-options! [{:keys [options-atom] :as inspector} options]
-  (reset! options-atom options))
-
 (defn inspect
   ([data]
    (inspect data {}))
@@ -109,15 +117,13 @@
    (let [data-atom    (atom data)
          options-atom (atom options)
          ui-atom      (atom (ui/layout (data->ui data [] options)))
-         ^JPanel tree (doto (proxy [JPanel] []
+         ^JPanel panel (doto (proxy [JPanel] []
                               (paintComponent [g]
-                                (ui/paint! @ui-atom g)))
-                        (.addKeyListener (key-listener))
-                        (.addMouseListener (mouse-listener ui-atom)))
+                                (ui/paint! @ui-atom g))))
          frame        (doto (JFrame. "Trinket tree inspector")
-                        (.add (JScrollPane. tree))
-                        (.setSize 400 600)
-                        (.setVisible true))]
+                        (.add (JScrollPane. panel))
+                        (.setSize 400 600))
+         inspector    (->Inspector data-atom options-atom ui-atom frame)]
 
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
@@ -129,7 +135,13 @@
                   (swap! ui-atom (fn [_] (ui/layout (data->ui @data-atom [] options))))
                   (.repaint frame)))
 
-     (->Inspector data-atom options-atom ui-atom frame))))
+     (doto panel
+       (.addKeyListener (key-listener inspector))
+       (.addMouseListener (mouse-listener inspector)))
+
+     (.setVisible frame true)
+
+     inspector)))
 
 
 (comment
