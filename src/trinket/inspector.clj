@@ -1,5 +1,6 @@
 (ns trinket.inspector
   (:require [trinket.ui :as ui]
+            [trinket.path :as path]
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
@@ -58,7 +59,7 @@
              (if (get expanded value-path)
                (data->ui v value-path options)
                (cond-> (ui/text (pr-str v))
-                 :always (assoc ::path value-path)
+                 :always (assoc ::path value-path ::index idx)
                  (= cursor value-path) (assoc ::cursor true)))
 
              ;; closing
@@ -91,8 +92,8 @@
       ::cursor      (= cursor path)
       ::ui/children
       (for [[idx [k v]] (map-indexed vector data)]
-        (let [key-path (conj path k ::key)
-              val-path (conj path k ::val)]
+        (let [key-path (conj path k ::path/key)
+              val-path (conj path k ::path/val)]
           (ui/map->Horizontal
            {::ui/children
             [;;opening
@@ -104,7 +105,7 @@
              (if (get expanded key-path)
                (data->ui k key-path options)
                (cond-> (ui/text (k->str k))
-                 :always (assoc ::path key-path)
+                 :always (assoc ::path key-path ::index idx)
                  (= cursor key-path) (assoc ::cursor true)))
 
              (ui/text " ")
@@ -113,7 +114,7 @@
              (if (get expanded val-path)
                (data->ui v val-path options)
                (cond-> (ui/text (pr-str v))
-                 :always (assoc ::path val-path)
+                 :always (assoc ::path val-path ::index idx)
                  (= cursor val-path) (assoc ::cursor true)))
 
              ;; closing
@@ -164,14 +165,29 @@
 (defn- cursor [{:keys [options-atom] :as inspector}]
   (::cursor @options-atom))
 
-(defn- move-cursor! [{:keys [options-atom] :as inspector} direction]
-  (let [options @options-atom]
-    (prn direction (::cursor options))
-    (cond (and (= :left direction) (= ::val (last (::cursor options))))
-          (swap-options! inspector update ::cursor #(conj (vec (butlast %)) ::key))
-          (and (= :right direction) (= ::key (last (::cursor options))))
-          (swap-options! inspector update ::cursor #(conj (vec (butlast %)) ::val))
-          :else nil)))
+(defn- move-cursor! [{:keys [ui-atom] :as inspector} direction]
+  (let [ui @ui-atom]
+    (cond
+      ;; left to go from map value to map key
+      (and (= :left direction) (path/val? (cursor inspector)))
+      (swap-options! inspector update ::cursor path/point-to-key)
+
+      ;; right to go from map key to map value
+      (and (= :right direction) (path/key? (cursor inspector)))
+      (swap-options! inspector update ::cursor path/point-to-val)
+
+      ;; up to go to previous key or value
+
+      ;; down to go to previous key or value
+
+      ;; right to go into structure
+
+      ;; left to get out of structure
+      (and (= :left direction) (zero? (::index (ui/find-component ui ::cursor))))
+      (swap-options! inspector update ::cursor path/up)
+
+      ;; left to go to top of structure
+      :else nil)))
 
 (defn- mouse-clicked [{:keys [ui-atom] :as inspector} ^MouseEvent e]
   (when-let [match (ui/component-at-point
@@ -192,7 +208,6 @@
     (mouseReleased [e])))
 
 (defn- key-pressed [inspector ^KeyEvent e]
-  (prn 'KEY e)
   (condp = (.getKeyCode e)
     KeyEvent/VK_ENTER (toggle-expansion! inspector (cursor inspector))
     KeyEvent/VK_LEFT  (move-cursor! inspector :left)
@@ -295,10 +310,10 @@
                   :bbbb  {:gg 88
                           :ffff 10}
                   :ccccc "This is a very important test"})
-  (set-options! ins {::expanded #{[:bbbb ::val]}
-                     ::cursor [:bbbb ::val]})
-  (set-options! ins {::expanded #{[:bbbb ::val]}
-                     ::cursor   [:bbbb ::val :gg ::val]})
+  (set-options! ins {::expanded #{[:bbbb ::path/val]}
+                     ::cursor [:bbbb ::path/val]})
+  (set-options! ins {::expanded #{[:bbbb ::path/val]}
+                     ::cursor   [:bbbb ::path/val :gg ::path/val]})
 
   (inspect {:a     {:inner1 20
                     :inner2 20
