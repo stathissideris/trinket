@@ -54,19 +54,31 @@
               val-path (conj path k ::val)]
           (ui/map->Horizontal
            {::ui/children
-            [(if (zero? idx) (ui/text "{") (ui/text " "))
+            [;;opening
+             (if (zero? idx)
+               (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
+               (ui/text " "))
+
+             ;;key
              (if (get expanded key-path)
                (data->ui k key-path options)
                (cond-> (ui/text (k->str k))
                  :always (assoc ::path key-path)
                  (= cursor key-path) (assoc ::cursor true)))
+
              (ui/text " ")
+
+             ;;value
              (if (get expanded val-path)
                (data->ui v val-path options)
                (cond-> (ui/text (pr-str v))
                  :always (assoc ::path val-path)
                  (= cursor val-path) (assoc ::cursor true)))
-             (if (= idx last-idx) (ui/text "}") (ui/text " "))]})))})))
+
+             ;; closing
+             (if (= idx last-idx)
+               (-> (ui/text "}") (assoc ::path path))
+               (ui/text " "))]})))})))
 
 (defn paint-cursor [ui ^Graphics2D g]
   (when-let [match (ui/find-component ui ::cursor)]
@@ -93,6 +105,15 @@
 (defn- swap-options! [{:keys [options-atom] :as inspector} & args]
   (apply swap! options-atom args))
 
+(defn- expanded? [{:keys [options-atom] :as inspector} path]
+  (get (::expanded @options-atom) path))
+
+(defn- expand! [inspector path]
+  (swap-options! inspector update ::expanded (fnil conj #{}) path))
+
+(defn- collapse! [inspector path]
+  (swap-options! inspector update ::expanded (fnil disj #{}) path))
+
 (defn- mouse-clicked [{:keys [ui-atom] :as inspector} ^MouseEvent e]
   (when-let [match (ui/component-at-point
                     {::ui/x (.getX e) ::ui/y (.getY e)}
@@ -100,7 +121,10 @@
     (println "click on:" (pr-str match))
     (condp = (.getClickCount e)
       1 (swap-options! inspector assoc ::cursor (::path match))
-      2 (swap-options! inspector update ::expanded (fnil conj #{}) (::path match)))))
+      2 (if (expanded? inspector (::path match))
+          (collapse! inspector (::path match))
+          (expand! inspector (::path match)))
+      nil)))
 
 (defn mouse-listener [{:keys [ui-atom] :as inspector}]
   (proxy [MouseListener] []
