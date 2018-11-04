@@ -155,6 +155,24 @@
 (defn- collapse! [inspector path]
   (swap-options! inspector update ::expanded (fnil disj #{}) path))
 
+(defn- toggle-expansion! [inspector path]
+  (when path
+    (if (expanded? inspector path)
+      (collapse! inspector path)
+      (expand! inspector path))))
+
+(defn- cursor [{:keys [options-atom] :as inspector}]
+  (::cursor @options-atom))
+
+(defn- move-cursor! [{:keys [options-atom] :as inspector} direction]
+  (let [options @options-atom]
+    (prn direction (::cursor options))
+    (cond (and (= :left direction) (= ::val (last (::cursor options))))
+          (swap-options! inspector update ::cursor #(conj (vec (butlast %)) ::key))
+          (and (= :right direction) (= ::key (last (::cursor options))))
+          (swap-options! inspector update ::cursor #(conj (vec (butlast %)) ::val))
+          :else nil)))
+
 (defn- mouse-clicked [{:keys [ui-atom] :as inspector} ^MouseEvent e]
   (when-let [match (ui/component-at-point
                     {::ui/x (.getX e) ::ui/y (.getY e)}
@@ -162,9 +180,7 @@
     (println "click on:" (pr-str match))
     (condp = (.getClickCount e)
       1 (swap-options! inspector assoc ::cursor (::path match))
-      2 (if (expanded? inspector (::path match))
-          (collapse! inspector (::path match))
-          (expand! inspector (::path match)))
+      2 (toggle-expansion! inspector (::path match))
       nil)))
 
 (defn mouse-listener [{:keys [ui-atom] :as inspector}]
@@ -175,15 +191,23 @@
     (mousePressed [e])
     (mouseReleased [e])))
 
+(defn- key-pressed [inspector ^KeyEvent e]
+  (prn 'KEY e)
+  (condp = (.getKeyCode e)
+    KeyEvent/VK_ENTER (toggle-expansion! inspector (cursor inspector))
+    KeyEvent/VK_LEFT  (move-cursor! inspector :left)
+    KeyEvent/VK_RIGHT (move-cursor! inspector :right)
+    KeyEvent/VK_UP    (move-cursor! inspector :up)
+    KeyEvent/VK_DOWN  (move-cursor! inspector :down)
+    ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
+    ;; \0 (reset! font-size default-font-size)
+    ;; \= (swap! font-size inc)
+    ;; \- (swap! font-size dec)
+    nil))
+
 (defn key-listener [inspector]
   (proxy [KeyListener] []
-    (keyPressed [^KeyEvent e]
-      (condp = (.getKeyChar e)
-        ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
-        ;; \0 (reset! font-size default-font-size)
-        ;; \= (swap! font-size inc)
-        ;; \- (swap! font-size dec)
-        nil))
+    (keyPressed [^KeyEvent e] (#'key-pressed inspector e))
     (keyReleased [e])
     (keyTyped [e])))
 
@@ -193,34 +217,34 @@
   ([data]
    (inspect data {}))
   ([data options]
-   (let [data-atom    (atom data)
-         options-atom (atom options)
-         ui-atom      (atom (ui/layout (data->ui data [] options)))
+   (let [data-atom     (atom data)
+         options-atom  (atom options)
+         ui-atom       (atom (ui/layout (data->ui data [] options)))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [g]
                                  (let [ui @ui-atom]
                                    (#'paint-cursor ui g)
                                    (ui/paint! ui g)))))
-         frame        (doto (JFrame. "Trinket tree inspector")
-                        (.add (JScrollPane. panel))
-                        (.setSize 400 600))
-         inspector    (->Inspector data-atom options-atom ui-atom frame)]
+         frame         (doto (JFrame. "Trinket tree inspector")
+                         (.add (JScrollPane. panel))
+                         (.setSize 400 600))
+         inspector     (->Inspector data-atom options-atom ui-atom frame)]
 
+     ;;connected atoms
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
                   (swap! ui-atom (fn [_] (ui/layout (data->ui data [] @options-atom))))
                   (.repaint frame)))
-
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ _ options]
                   (swap! ui-atom (fn [_] (ui/layout (data->ui @data-atom [] options))))
                   (.repaint frame)))
 
-     (doto panel
+     ;;listeners
+     (.addMouseListener panel (mouse-listener inspector))
+     (doto frame
        (.addKeyListener (key-listener inspector))
-       (.addMouseListener (mouse-listener inspector)))
-
-     (.setVisible frame true)
+       (.setVisible true))
 
      inspector)))
 
