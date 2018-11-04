@@ -45,6 +45,7 @@
      {::ui/x        15 ;;overwritten when it's nested
       ::ui/y        15
       ::cursor      (= cursor path)
+      ::tag         (collection-tag data)
       ::ui/children
       (for [[idx v] (map-indexed vector data)]
         (let [value-path (conj path idx)]
@@ -59,7 +60,12 @@
              (if (get expanded value-path)
                (data->ui v value-path options)
                (cond-> (ui/text (pr-str v))
-                 :always (assoc ::path value-path ::index idx ::tag (collection-tag v))
+                 :always (assoc
+                          ::path value-path
+                          ::index idx
+                          ::tag (collection-tag v))
+                 (zero? idx) (assoc ::first true)
+                 (= idx last-idx) (assoc ::last true)
                  (= cursor value-path) (assoc ::cursor true)))
 
              ;; closing
@@ -90,6 +96,7 @@
      {::ui/x        15 ;;overwritten when it's nested
       ::ui/y        15
       ::cursor      (= cursor path)
+      ::tag         (collection-tag data)
       ::ui/children
       (for [[idx [k v]] (map-indexed vector data)]
         (let [key-path (conj path idx ::path/key)
@@ -105,7 +112,11 @@
              (if (get expanded key-path)
                (data->ui k key-path options)
                (cond-> (ui/text (k->str k))
-                 :always (assoc ::path key-path ::index idx ::tag (collection-tag k))
+                 :always (assoc ::path key-path
+                                ::index idx
+                                ::tag (collection-tag k))
+                 (zero? idx) (assoc ::first true)
+                 (= idx last-idx) (assoc ::last true)
                  (= cursor key-path) (assoc ::cursor true)))
 
              (ui/text " ")
@@ -114,7 +125,11 @@
              (if (get expanded val-path)
                (data->ui v val-path options)
                (cond-> (ui/text (pr-str v))
-                 :always (assoc ::path val-path ::index idx ::tag (collection-tag v))
+                 :always (assoc ::path val-path
+                                ::index idx
+                                ::tag (collection-tag v))
+                 (zero? idx) (assoc ::first true)
+                 (= idx last-idx) (assoc ::last true)
                  (= cursor val-path) (assoc ::cursor true)))
 
              ;; closing
@@ -168,6 +183,14 @@
 (defn- move-cursor! [{:keys [ui-atom] :as inspector} direction]
   (let [ui @ui-atom]
     (cond
+      ;; going in!
+      (= :in direction)
+      (let [tag (::tag (ui/find-component ui ::cursor))]
+        (when (and (not= tag :atom) (expanded? inspector (cursor inspector)))
+          (if (= tag :map)
+            (swap-options! inspector update ::cursor conj 0 ::path/key)
+            (swap-options! inspector update ::cursor conj 0))))
+
       ;; left to go from map value to map key
       (and (= :left direction) (path/val? (cursor inspector)))
       (swap-options! inspector update ::cursor path/point-to-key)
@@ -177,16 +200,37 @@
       (swap-options! inspector update ::cursor path/point-to-val)
 
       ;; up to go to previous key or value
+      (and (= :up direction) (not (::first (ui/find-component ui ::cursor))))
+      (swap-options! inspector update ::cursor path/left)
 
-      ;; down to go to previous key or value
+      ;; down to go to next key or value
+      (and (= :down direction) (not (::last (ui/find-component ui ::cursor))))
+      (swap-options! inspector update ::cursor path/right)
 
-      ;; right to go into structure
+      ;; down on the last element to go up again
+      (and (#{:down :right} direction) (::last (ui/find-component ui ::cursor)))
+      (swap-options! inspector update ::cursor path/up)
 
       ;; left to get out of structure
-      (and (= :left direction) (zero? (::index (ui/find-component ui ::cursor))))
+      (and (#{:left :up} direction) (::first (ui/find-component ui ::cursor)))
       (swap-options! inspector update ::cursor path/up)
 
       ;; left to go to top of structure
+      (and (= :left direction) (not (::first (ui/find-component ui ::cursor))))
+      (swap-options! inspector update ::cursor path/first)
+
+      ;; right to go to bottom of structure
+      ;;(and (= :right direction) (not (::last (ui/find-component ui ::cursor))))
+      ;;(swap-options! inspector update ::cursor path/last)
+
+      ;; right or down to go into structure
+      (#{:right :down} direction)
+      (let [tag (::tag (ui/find-component ui ::cursor))]
+        (when (and (not= tag :atom) (expanded? inspector (cursor inspector)))
+          (if (= tag :map)
+            (swap-options! inspector update ::cursor conj 0 ::path/key)
+            (swap-options! inspector update ::cursor conj 0))))
+
       :else nil)))
 
 (defn- mouse-clicked [{:keys [ui-atom] :as inspector} ^MouseEvent e]
@@ -208,11 +252,17 @@
     (mousePressed [e])
     (mouseReleased [e])))
 
-(defn- key-pressed [inspector ^KeyEvent e]
+(defn- key-pressed [{:keys [ui-atom] :as inspector} ^KeyEvent e]
   (condp = (.getKeyCode e)
-    KeyEvent/VK_ENTER (toggle-expansion! inspector (cursor inspector))
+    KeyEvent/VK_ENTER (if (.isShiftDown e)
+                        (move-cursor! inspector :in)
+                        (toggle-expansion! inspector (cursor inspector)))
     KeyEvent/VK_LEFT  (move-cursor! inspector :left)
-    KeyEvent/VK_RIGHT (move-cursor! inspector :right)
+    KeyEvent/VK_RIGHT (let [ui @ui-atom]
+                        (if (and (not (expanded? inspector (cursor inspector)))
+                                 (not= :atom (::tag (ui/find-component ui ::cursor))))
+                          (expand! inspector (cursor inspector))
+                          (move-cursor! inspector :right)))
     KeyEvent/VK_UP    (move-cursor! inspector :up)
     KeyEvent/VK_DOWN  (move-cursor! inspector :down)
     ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
