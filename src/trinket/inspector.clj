@@ -11,7 +11,8 @@
 
 (set! *warn-on-reflection* true)
 
-(def default-options {::cursor []})
+(def default-options {::cursor       []
+                      ::show-indexes true})
 
 (defn- right-pad [^String s length]
   (str s (apply str (repeat (- length (.length s)) " "))))
@@ -71,10 +72,10 @@
                ;;value
                (ui/map->Horizontal
                 {::ui/children
-                 [(if (get expanded value-path)
+                 [(when show-indexes (ui/text {::ui/text (str idx) ::ui/size 7 ::ui/font ui/font-regular}))
+                  (if (get expanded value-path)
                     (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
-                    (atom->ui {:data v :idx idx :last-idx last-idx :path value-path :cursor cursor}))
-                  (when show-indexes (ui/text {::ui/text (str idx) ::ui/size 7}))]})
+                    (atom->ui {:data v :idx idx :last-idx last-idx :path value-path :cursor cursor}))]})
 
                ;; closing
                (if (= idx last-idx)
@@ -155,13 +156,16 @@
   s)
 
 (defn- set-data! [{:keys [data-atom] :as inspector} data]
-  (reset! data-atom data))
+  (reset! data-atom data)
+  nil) ;;prevent print explosion
 
 (defn- set-options! [{:keys [options-atom] :as inspector} options]
-  (reset! options-atom options))
+  (reset! options-atom options)
+  nil) ;;prevent print explosion
 
 (defn- swap-options! [{:keys [options-atom] :as inspector} & args]
-  (apply swap! options-atom args))
+  (apply swap! options-atom args)
+  nil) ;;prevent print explosion
 
 (defn- expanded? [{:keys [options-atom] :as inspector} path]
   (get (::expanded @options-atom) path))
