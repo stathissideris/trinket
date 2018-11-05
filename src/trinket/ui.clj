@@ -47,6 +47,11 @@
 
 (def ^JLabel text-stamp (doto (JLabel.) (.setFont font-mono)))
 
+(def derive-font
+  (memoize
+   (fn [font size]
+     (.deriveFont font (float size)))))
+
 (defrecord Text []
   Component
   (paint! [{::keys [text selected font size] :as this} g]
@@ -59,7 +64,7 @@
         (.setOpaque false)))
     (-> text-stamp (.setFont (or font font-mono)))
     (when size
-      (.setFont text-stamp (-> text-stamp .getFont (.deriveFont (float size))))) ;;memoize
+      (.setFont text-stamp (-> text-stamp .getFont (derive-font size))))
     (paint-at! text-stamp g this))
   (ideal-size [this]
     (.setText text-stamp (::text this))

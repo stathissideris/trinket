@@ -242,7 +242,6 @@
   (when-let [match (ui/component-at-point
                     {::ui/x (.getX e) ::ui/y (.getY e)}
                     @ui-atom)]
-    (println "click on:" (pr-str match))
     (condp = (.getClickCount e)
       1 (swap-options! inspector assoc ::cursor (::path match))
       2 (when-not (= :atom (::tag match))
