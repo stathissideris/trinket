@@ -49,7 +49,7 @@
     (and idx (= idx last-idx)) (assoc ::last true)
     (and cursor (= cursor path)) (assoc ::cursor true)))
 
-(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str idx last-idx] :as options}]
+(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx] :as options}]
   (if-not (get expanded path)
     (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor})
     (let [last-idx (dec (count data))]
@@ -69,9 +69,12 @@
                  (ui/text (or indent-str " ")))
 
                ;;value
-               (if (get expanded value-path)
-                 (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
-                 (atom->ui {:data v :idx idx :last-idx last-idx :path value-path :cursor cursor}))
+               (ui/map->Horizontal
+                {::ui/children
+                 [(if (get expanded value-path)
+                    (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
+                    (atom->ui {:data v :idx idx :last-idx last-idx :path value-path :cursor cursor}))
+                  (when show-indexes (ui/text {::ui/text (str idx) ::ui/size 7}))]})
 
                ;; closing
                (if (= idx last-idx)
@@ -88,7 +91,10 @@
 
 (defmethod data->ui :set
   [data path options]
-  (sequential->ui data path (assoc options ::opening "#{" ::closing "}" ::indent-str "  ")))
+  (sequential->ui data path
+                  (-> options
+                      (assoc ::opening "#{" ::closing "}" ::indent-str "  ")
+                      (dissoc ::show-indexes))))
 
 (defmethod data->ui :map
   [data path {::keys [cursor expanded idx last-idx] :as options}]
@@ -248,24 +254,28 @@
     (mouseReleased [e])))
 
 (defn- key-pressed [{:keys [ui-atom] :as inspector} ^KeyEvent e]
-  (condp = (.getKeyCode e)
-    KeyEvent/VK_ENTER (if (.isShiftDown e)
-                        (move-cursor! inspector :in)
-                        (when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
-                          (toggle-expansion! inspector (cursor inspector))))
-    KeyEvent/VK_LEFT  (move-cursor! inspector :left)
-    KeyEvent/VK_RIGHT (let [ui @ui-atom]
-                        (if (and (not (expanded? inspector (cursor inspector)))
-                                 (not= :atom (::tag (ui/find-component ui ::cursor))))
-                          (expand! inspector (cursor inspector))
-                          (move-cursor! inspector :right)))
-    KeyEvent/VK_UP    (move-cursor! inspector :up)
-    KeyEvent/VK_DOWN  (move-cursor! inspector :down)
-    ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
-    ;; \0 (reset! font-size default-font-size)
-    ;; \= (swap! font-size inc)
-    ;; \- (swap! font-size dec)
-    nil))
+  (let [expand-fn #(when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
+                     (toggle-expansion! inspector (cursor inspector)))]
+    (condp = (.getKeyCode e)
+      KeyEvent/VK_TAB   (expand-fn)
+      KeyEvent/VK_ENTER (if (.isShiftDown e)
+                          (move-cursor! inspector :in)
+                          (expand-fn))
+      KeyEvent/VK_LEFT  (move-cursor! inspector :left)
+      KeyEvent/VK_RIGHT (let [ui @ui-atom]
+                          (if (and (not (expanded? inspector (cursor inspector)))
+                                   (not= :atom (::tag (ui/find-component ui ::cursor))))
+                            (expand! inspector (cursor inspector))
+                            (move-cursor! inspector :right)))
+      KeyEvent/VK_UP    (move-cursor! inspector :up)
+      KeyEvent/VK_DOWN  (move-cursor! inspector :down)
+
+      KeyEvent/VK_S     (swap-options! inspector update ::show-indexes not)
+      ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
+      ;; \0 (reset! font-size default-font-size)
+      ;; \= (swap! font-size inc)
+      ;; \- (swap! font-size dec)
+      nil)))
 
 (defn key-listener [inspector]
   (proxy [KeyListener] []
@@ -377,10 +387,19 @@
                   :bbbb  {:gg 88
                           :ffff 10}
                   :ccccc "This is a very important test"})
-  (set-options! ins {::expanded #{[:bbbb ::path/val]}
-                     ::cursor [:bbbb ::path/val]})
-  (set-options! ins {::expanded #{[:bbbb ::path/val]}
-                     ::cursor   [:bbbb ::path/val :gg ::path/val]})
+
+  (set-data! ins (vec (map #(apply str (repeat % "O")) (range 200))))
+
+  (set-options! ins {::expanded #{[] [2 ::path/val]}
+                     ::cursor [2 ::path/val]})
+
+  (set-options! ins {::expanded #{[] [1 ::path/val]}
+                     ::cursor   [1 ::path/val 0 ::path/val]})
+
+  (defn- refresh! [{:keys [data-atom] :as inspector}]
+    (swap! data-atom identity))
+
+  (refresh! ins)
 
   (inspect {:a     {:inner1 20
                     :inner2 20

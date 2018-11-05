@@ -8,6 +8,9 @@
 
 (def selection-background (Color/decode "0xb4d9fc"))
 
+(def font-mono (Font. "Monaco" Font/PLAIN default-font-size))
+(def font-regular (Font. "Lucinda Grande" Font/PLAIN default-font-size))
+
 (defmacro save-transform [g & body]
   `(let [g#  ~g
          tr# (.getTransform ^Graphics2D g#)]
@@ -15,16 +18,13 @@
        (.setTransform g# tr#)
        res#)))
 
-
 (defprotocol Component
   (paint! [this g])
   (ideal-size [this])
   (layout [this]))
 
-
 (defn set-bounds! [^JComponent c {::keys [x y w h]}]
   (.setBounds c x y w h))
-
 
 (defn paint-at! [^JComponent component ^Graphics2D g {::keys [^int x ^int y w h] :as bounds}]
   (assert x)
@@ -45,22 +45,21 @@
     (let [ps (.getPreferredSize this)]
       {::w (.getWidth ps) ::h (.getHeight ps)})))
 
-(def ^JLabel text-stamp (doto (JLabel.)
-                          (.setFont (Font. "Monaco" Font/PLAIN @font-size))
-                          ;;(.setOpaque true)
-                          ;;(.setBackground selection-background)
-                          ))
+(def ^JLabel text-stamp (doto (JLabel.) (.setFont font-mono)))
 
 (defrecord Text []
   Component
-  (paint! [this g]
-    (.setText text-stamp (::text this))
-    (if (::selected this)
+  (paint! [{::keys [text selected font size] :as this} g]
+    (.setText text-stamp text)
+    (if selected
       (doto text-stamp
         (.setOpaque true)
         (.setBackground selection-background))
       (doto text-stamp
         (.setOpaque false)))
+    (-> text-stamp (.setFont (or font font-mono)))
+    (when size
+      (.setFont text-stamp (-> text-stamp .getFont (.deriveFont (float size))))) ;;memoize
     (paint-at! text-stamp g this))
   (ideal-size [this]
     (.setText text-stamp (::text this))
@@ -88,11 +87,11 @@
 (defrecord Horizontal []
   Component
   (paint! [this g]
-    (doseq [c (::children this)] (paint! c g)))
+    (doseq [c (remove nil? (::children this))] (paint! c g)))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
-    (let [new-children (linear-arrange children this right-of)]
+    (let [new-children (linear-arrange (remove nil? children) this right-of)]
       (assoc this
              ::children new-children
              ::w (apply + (map ::w new-children))
@@ -104,11 +103,11 @@
 (defrecord Vertical []
   Component
   (paint! [this g]
-    (doseq [c (::children this)] (paint! c g)))
+    (doseq [c (remove nil? (::children this))] (paint! c g)))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
-    (let [new-children (linear-arrange children this below-of)]
+    (let [new-children (linear-arrange (remove nil? children) this below-of)]
       (assoc this
              ::children new-children
              ::w (apply max (map ::w new-children))

@@ -12,13 +12,16 @@
       (vec (drop-last 2 path))
       (vec (butlast path)))))
 
+(defn- dec-or-zero [x]
+  (max 0 (dec x)))
+
 (defn left [path]
   (if (empty? path)
     path
     (let [last-nth (dec (count path))]
       (if (in-map? path)
-        (update path (dec last-nth) dec)
-        (update path last-nth dec)))))
+        (update path (dec last-nth) dec-or-zero)
+        (update path last-nth dec-or-zero)))))
 
 (defn right [path]
   (if (empty? path)
