@@ -39,39 +39,45 @@
 
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
-(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str] :as options}]
-  (let [last-idx (dec (count data))]
-    (ui/map->Vertical
-     {::ui/x        15 ;; overwritten when it's nested
-      ::ui/y        15
-      ::cursor      (= cursor path)
-      ::tag         (collection-tag data)
-      ::ui/children
-      (for [[idx v] (map-indexed vector data)]
-        (let [value-path (conj path idx)]
-          (ui/map->Horizontal
-           {::ui/children
-            [ ;;opening
-             (if (zero? idx)
-               (-> (ui/text opening) (assoc ::path path)) ;; assoc path to allow mouse selection of whole map
-               (ui/text (or indent-str " ")))
+(defn atom->ui [{:keys [data text idx last-idx path cursor]}]
+  (cond-> (ui/text {::ui/text (if text text (pr-str data))
+                    ::ui/x    15 ;;overwritten when it's nested
+                    ::ui/y    15})
+    :always (assoc ::path path
+                   ::index idx
+                   ::tag (collection-tag data))
+    (and idx (zero? idx)) (assoc ::first true)
+    (and idx (= idx last-idx)) (assoc ::last true)
+    (and cursor (= cursor path)) (assoc ::cursor true)))
 
-             ;;value
-             (if (get expanded value-path)
-               (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
-               (cond-> (ui/text (pr-str v))
-                 :always (assoc
-                          ::path value-path
-                          ::index idx
-                          ::tag (collection-tag v))
-                 (zero? idx) (assoc ::first true)
-                 (= idx last-idx) (assoc ::last true)
-                 (= cursor value-path) (assoc ::cursor true)))
+(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str idx last-idx] :as options}]
+  (if-not (get expanded path)
+    (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor})
+    (let [last-idx (dec (count data))]
+      (ui/map->Vertical
+       {::ui/x        15 ;; overwritten when it's nested
+        ::ui/y        15
+        ::cursor      (= cursor path)
+        ::tag         (collection-tag data)
+        ::ui/children
+        (for [[idx v] (map-indexed vector data)]
+          (let [value-path (conj path idx)]
+            (ui/map->Horizontal
+             {::ui/children
+              [ ;;opening
+               (if (zero? idx)
+                 (-> (ui/text opening) (assoc ::path path)) ;; assoc path to allow mouse selection of whole map
+                 (ui/text (or indent-str " ")))
 
-             ;; closing
-             (if (= idx last-idx)
-               (-> (ui/text closing) (assoc ::path path))
-               (ui/text " "))]})))})))
+               ;;value
+               (if (get expanded value-path)
+                 (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
+                 (atom->ui {:data v :idx idx :last-idx last-idx :path value-path :cursor cursor}))
+
+               ;; closing
+               (if (= idx last-idx)
+                 (-> (ui/text closing) (assoc ::path path))
+                 (ui/text " "))]})))}))))
 
 (defmethod data->ui :vector
   [data path options]
@@ -86,56 +92,46 @@
   (sequential->ui data path (assoc options ::opening "#{" ::closing "}" ::indent-str "  ")))
 
 (defmethod data->ui :map
-  [data path {::keys [cursor expanded] :as options}]
+  [data path {::keys [cursor expanded idx last-idx] :as options}]
   (let [k->str   (zipmap (keys data)
                          (map pr-str (keys data)))
         longest  (apply max (map count (vals k->str)))
         k->str   (update-vals k->str #(right-pad % longest))
         last-idx (dec (count data))]
-    (ui/map->Vertical
-     {::ui/x        15 ;;overwritten when it's nested
-      ::ui/y        15
-      ::cursor      (= cursor path)
-      ::tag         (collection-tag data)
-      ::ui/children
-      (for [[idx [k v]] (map-indexed vector data)]
-        (let [key-path (conj path idx ::path/key)
-              val-path (conj path idx ::path/val)]
-          (ui/map->Horizontal
-           {::ui/children
-            [;;opening
-             (if (zero? idx)
-               (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
-               (ui/text " "))
+    (if-not (get expanded path)
+      (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor})
+      (ui/map->Vertical
+       {::ui/x        15 ;;overwritten when it's nested
+        ::ui/y        15
+        ::cursor      (= cursor path)
+        ::tag         (collection-tag data)
+        ::ui/children
+        (for [[idx [k v]] (map-indexed vector data)]
+          (let [key-path (conj path idx ::path/key)
+                val-path (conj path idx ::path/val)]
+            (ui/map->Horizontal
+             {::ui/children
+              [ ;;opening
+               (if (zero? idx)
+                 (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
+                 (ui/text " "))
 
-             ;;key
-             (if (get expanded key-path)
-               (data->ui k key-path options)
-               (cond-> (ui/text (k->str k))
-                 :always (assoc ::path key-path
-                                ::index idx
-                                ::tag (collection-tag k))
-                 (zero? idx) (assoc ::first true)
-                 (= idx last-idx) (assoc ::last true)
-                 (= cursor key-path) (assoc ::cursor true)))
+               ;;key
+               (if (get expanded key-path)
+                 (data->ui k key-path (assoc options :idx idx :last-idx last-idx))
+                 (atom->ui {:data k :text (k->str k) :idx idx :last-idx last-idx :path key-path :cursor cursor}))
 
-             (ui/text " ")
+               (ui/text " ")
 
-             ;;value
-             (if (get expanded val-path)
-               (data->ui v val-path options)
-               (cond-> (ui/text (pr-str v))
-                 :always (assoc ::path val-path
-                                ::index idx
-                                ::tag (collection-tag v))
-                 (zero? idx) (assoc ::first true)
-                 (= idx last-idx) (assoc ::last true)
-                 (= cursor val-path) (assoc ::cursor true)))
+               ;;value
+               (if (get expanded val-path)
+                 (data->ui v val-path (assoc options :idx idx :last-idx last-idx))
+                 (atom->ui {:data v :idx idx :last-idx last-idx :path val-path :cursor cursor}))
 
-             ;; closing
-             (if (= idx last-idx)
-               (-> (ui/text "}") (assoc ::path path))
-               (ui/text " "))]})))})))
+               ;; closing
+               (if (= idx last-idx)
+                 (-> (ui/text "}") (assoc ::path path))
+                 (ui/text " "))]})))}))))
 
 (defn paint-cursor [ui ^Graphics2D g]
   (when-let [match (ui/find-component ui ::cursor)]
@@ -256,7 +252,8 @@
   (condp = (.getKeyCode e)
     KeyEvent/VK_ENTER (if (.isShiftDown e)
                         (move-cursor! inspector :in)
-                        (toggle-expansion! inspector (cursor inspector)))
+                        (when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
+                          (toggle-expansion! inspector (cursor inspector))))
     KeyEvent/VK_LEFT  (move-cursor! inspector :left)
     KeyEvent/VK_RIGHT (let [ui @ui-atom]
                         (if (and (not (expanded? inspector (cursor inspector)))
@@ -356,6 +353,23 @@
                :are "handled"
                :as  "well!"} "yay!"
               :ccccc         "This is a test"}))
+
+  (def ins
+    (inspect ["foo"
+              {:a             10000
+                :bbbb          {:gg 88
+                                :ffff 10}
+                :ee            ["this is a vec" 1000 :foo "tt"]
+                :list          (list "this is a list" 4000 :foo "tt")
+                :set           #{"sets are nice too"
+                                 "sets are nice 3"
+                                 "sets are nice 4"}
+                {:map "keys"
+                 :are "handled"
+                 :as  "well!"} "yay!"
+               :ccccc         "This is a test"}
+              "bar"
+              "baz"]))
 
   (set-data! ins {:a     10000
                   :bbbb  {:gg 88
