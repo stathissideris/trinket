@@ -11,8 +11,7 @@
 
 (set! *warn-on-reflection* true)
 
-(defonce current-data (atom nil))
-(defonce current-options (atom nil))
+(def default-options {::cursor []})
 
 (defn- right-pad [^String s length]
   (str s (apply str (repeat (- length (.length s)) " "))))
@@ -203,9 +202,9 @@
       (and (= :down direction) (not (::last (ui/find-component ui ::cursor))))
       (swap-options! inspector update ::cursor path/right)
 
-      ;; down on the last element to go up again
-      (and (#{:down :right} direction) (::last (ui/find-component ui ::cursor)))
-      (swap-options! inspector update ::cursor path/up)
+      ;; down on the last element to go up again - disabled for now, I think this is confusing
+      ;; (and (#{:down :right} direction) (::last (ui/find-component ui ::cursor)))
+      ;; (swap-options! inspector update ::cursor path/up)
 
       ;; left to get out of structure
       (and (#{:left :up} direction) (::first (ui/find-component ui ::cursor)))
@@ -281,7 +280,7 @@
    (inspect data {}))
   ([data options]
    (let [data-atom     (atom data)
-         options-atom  (atom options)
+         options-atom  (atom (merge default-options options))
          ui-atom       (atom (ui/layout (data->ui data [] options)))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [g]
@@ -343,6 +342,9 @@
   (def ins
     (inspect {:a             10000
               :bbbb          {:gg 88
+                              :a 10
+                              :b 33
+                              :g 999
                               :ffff 10}
               :ee            ["this is a vec" 1000 :foo "tt"]
               :list          (list "this is a list" 4000 :foo "tt")
