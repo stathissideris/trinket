@@ -28,32 +28,44 @@
                (assoc m (fun k) v))
              {} m))
 
+(defn- lazy? [x] (instance? clojure.lang.LazySeq x))
+
 (defn collection-tag [x]
   (cond
-    (map? x)                           :map
-    (set? x)                           :set
-    (vector? x)                        :vector
-    (list? x)                          :list
-    (string? x)                        :list
-    (instance? clojure.lang.LazySeq x) :lazy-seq
-    :else                              :atom))
+    (map? x)    :map
+    (set? x)    :set
+    (vector? x) :vector
+    (list? x)   :list
+    (string? x) :list
+    (lazy? x)   :lazy-seq
+    :else       :atom))
 
 (defmulti data->ui (fn [data path options] (collection-tag data)))
+
+(def lazy-indicator
+  (ui/text {::ui/text  "L"
+            ::ui/size  8
+            ::ui/font  ui/font-regular
+            ::ui/color ui/color-index}))
+
+(defn- indicate-lazy [ui]
+  (ui/map->Horizontal {::ui/children [lazy-indicator ui]}))
 
 (defn atom->ui [{:keys [data text idx last-idx path cursor]}]
   (let [color (cond (keyword? data) ui/color-keywords
                     (string? data)  ui/color-strings
                     :else           ui/color-text)]
-   (cond-> (ui/text {::ui/text  (if text text (pr-str data))
-                     ::ui/x     10 ;;overwritten when it's nested
-                     ::ui/y     10
-                     ::ui/color color})
-     :always (assoc ::path path
-                    ::index idx
-                    ::tag (collection-tag data))
-     (and idx (zero? idx)) (assoc ::first true)
-     (and idx (= idx last-idx)) (assoc ::last true)
-     (and cursor (= cursor path)) (assoc ::cursor true))))
+    (cond-> (ui/text {::ui/text  (if text text (pr-str data))
+                      ::ui/x     10 ;;overwritten when it's nested
+                      ::ui/y     10
+                      ::ui/color color})
+      :always (assoc ::path path
+                     ::index idx
+                     ::tag (collection-tag data))
+      (and idx (zero? idx)) (assoc ::first true)
+      (and idx (= idx last-idx)) (assoc ::last true)
+      (and cursor (= cursor path)) (assoc ::cursor true)
+      (lazy? data) (indicate-lazy))))
 
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx] :as options}]
   (if-not (get expanded path)
@@ -89,6 +101,16 @@
                (if (= idx last-idx)
                  (-> (ui/text closing) (assoc ::path path))
                  (ui/text " "))]})))}))))
+
+(defn lazy->ui [data path {::keys [cursor expanded idx last-idx] :as options}]
+  (if-not (get expanded path)
+    (indicate-lazy (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor}))
+    (let [last-idx (dec (count data))]
+      (indicate-lazy (sequential->ui data path options)))))
+
+(defmethod data->ui :lazy-seq
+  [data path options]
+  (lazy->ui data path (assoc options ::opening "(" ::closing ")")))
 
 (defmethod data->ui :vector
   [data path options]
@@ -393,19 +415,34 @@
   (def ins
     (inspect ["foo"
               {:a             10000
-                :bbbb          {:gg 88
-                                :ffff 10}
-                :ee            ["this is a vec" 1000 :foo "tt"]
-                :list          (list "this is a list" 4000 :foo "tt")
-                :set           #{"sets are nice too"
-                                 "sets are nice 3"
-                                 "sets are nice 4"}
-                {:map "keys"
-                 :are "handled"
-                 :as  "well!"} "yay!"
+               :bbbb          {:gg 88
+                               :ffff 10}
+               :ee            ["this is a vec" 1000 :foo "tt"]
+               :list          (list "this is a list" 4000 :foo "tt")
+               :set           #{"sets are nice too"
+                                "sets are nice 3"
+                                "sets are nice 4"}
+               {:map "keys"
+                :are "handled"
+                :as  "well!"} "yay!"
                :ccccc         "This is a test"}
               "bar"
               "baz"]))
+
+  (def ins
+    (inspect {:a             10000
+              :bbbb          {:gg 88
+                              :ffff 10}
+              :ee            ["this is a vec" 1000 :foo "tt"]
+              :list          (map inc (range 10))
+              :set           #{"sets are nice too"
+                               "sets are nice 3"
+                               "sets are nice 4"}
+              {:map "keys"
+               :are "handled"
+               :as  "well!"} "yay!"
+              :ccccc         "This is a test"}))
+
 
   (set-data! ins {:a     10000
                   :bbbb  {:gg 88
