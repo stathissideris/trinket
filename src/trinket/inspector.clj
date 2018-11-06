@@ -7,7 +7,7 @@
   (:import [java.awt Toolkit Graphics2D]
            [java.awt.event KeyListener KeyEvent MouseListener MouseEvent]
            [java.awt.datatransfer StringSelection]
-           [javax.swing JPanel JFrame JScrollPane]))
+           [javax.swing JPanel JFrame JScrollPane BorderFactory]))
 
 (set! *warn-on-reflection* true)
 
@@ -40,15 +40,19 @@
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
 (defn atom->ui [{:keys [data text idx last-idx path cursor]}]
-  (cond-> (ui/text {::ui/text (if text text (pr-str data))
-                    ::ui/x    15 ;;overwritten when it's nested
-                    ::ui/y    15})
-    :always (assoc ::path path
-                   ::index idx
-                   ::tag (collection-tag data))
-    (and idx (zero? idx)) (assoc ::first true)
-    (and idx (= idx last-idx)) (assoc ::last true)
-    (and cursor (= cursor path)) (assoc ::cursor true)))
+  (let [color (cond (keyword? data) ui/color-keywords
+                    (string? data)  ui/color-strings
+                    :else           ui/color-text)]
+   (cond-> (ui/text {::ui/text  (if text text (pr-str data))
+                     ::ui/x     15 ;;overwritten when it's nested
+                     ::ui/y     15
+                     ::ui/color color})
+     :always (assoc ::path path
+                    ::index idx
+                    ::tag (collection-tag data))
+     (and idx (zero? idx)) (assoc ::first true)
+     (and idx (= idx last-idx)) (assoc ::last true)
+     (and cursor (= cursor path)) (assoc ::cursor true))))
 
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx] :as options}]
   (if-not (get expanded path)
@@ -72,7 +76,10 @@
                ;;value
                (ui/map->Horizontal
                 {::ui/children
-                 [(when show-indexes (ui/text {::ui/text (str idx) ::ui/size 7 ::ui/font ui/font-regular}))
+                 [(when show-indexes (ui/text {::ui/text  (str idx)
+                                               ::ui/size  8
+                                               ::ui/font  ui/font-regular
+                                               ::ui/color ui/color-index}))
                   (if (get expanded value-path)
                     (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
                     (atom->ui {:data v :idx idx :last-idx last-idx :path value-path :cursor cursor}))]})
@@ -143,7 +150,7 @@
   (when-let [match (ui/find-component ui ::cursor)]
     (let [cursor (ui/grow-bounds match 1)]
       (doto g
-        (.setColor ui/selection-background)
+        (.setColor ui/color-selection-background)
         (.fillRect (int (::ui/x cursor))
                    (int (::ui/y cursor))
                    (int (::ui/w cursor))
@@ -296,8 +303,11 @@
          options-atom  (atom (merge default-options options))
          ui-atom       (atom (ui/layout (data->ui data [] options)))
          ^JPanel panel (doto (proxy [JPanel] []
-                               (paintComponent [g]
+                               (paintComponent [^Graphics2D g]
                                  (let [ui @ui-atom]
+                                   (doto g
+                                     (.setColor ui/color-background)
+                                     (.fillRect -2 -2 (+ 2 (.getWidth ^JPanel this)) (+ 2 (.getHeight ^JPanel this))))
                                    (#'paint-cursor ui g)
                                    (ui/paint! ui g)))))
          frame         (doto (JFrame. "Trinket tree inspector")
@@ -316,7 +326,9 @@
                   (.repaint frame)))
 
      ;;listeners
-     (.addMouseListener panel (mouse-listener inspector))
+     (doto panel
+       (.setBorder (BorderFactory/createEmptyBorder))
+       (.addMouseListener (mouse-listener inspector)))
      (doto frame
        (.addKeyListener (key-listener inspector))
        (.setVisible true))

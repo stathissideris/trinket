@@ -6,7 +6,14 @@
 (def default-font-size 11)
 (def font-size (atom default-font-size))
 
-(def selection-background (Color/decode "0xb4d9fc"))
+(def color-selection-background (-> (Color/decode "0x5ab2ec")
+                                    .darker
+                                    .darker))
+(def color-index Color/GRAY)
+(def color-background (Color/decode "0x282c34"))
+(def color-text (Color/decode "0xbbc2ce"))
+(def color-keywords (Color/decode "0xa8a4de"))
+(def color-strings (Color/decode "0x9bbc68")) ;;and namespaces too
 
 (def font-mono (Font. "Monaco" Font/PLAIN default-font-size))
 (def font-regular (Font. "Lucinda Grande" Font/PLAIN default-font-size))
@@ -54,17 +61,20 @@
 
 (defrecord Text []
   Component
-  (paint! [{::keys [text selected font size] :as this} g]
+  (paint! [{::keys [text selected font size color] :as this} g]
     (.setText text-stamp text)
     (if selected
       (doto text-stamp
         (.setOpaque true)
-        (.setBackground selection-background))
+        (.setBackground color-selection-background))
       (doto text-stamp
         (.setOpaque false)))
     (-> text-stamp (.setFont (or font font-mono)))
     (when size
       (.setFont text-stamp (-> text-stamp .getFont (derive-font size))))
+    (if color
+      (.setForeground text-stamp color)
+      (.setForeground text-stamp color-text))
     (paint-at! text-stamp g this))
   (ideal-size [this]
     (.setText text-stamp (::text this))
