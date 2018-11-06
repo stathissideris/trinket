@@ -45,8 +45,8 @@
                     (string? data)  ui/color-strings
                     :else           ui/color-text)]
    (cond-> (ui/text {::ui/text  (if text text (pr-str data))
-                     ::ui/x     15 ;;overwritten when it's nested
-                     ::ui/y     15
+                     ::ui/x     10 ;;overwritten when it's nested
+                     ::ui/y     10
                      ::ui/color color})
      :always (assoc ::path path
                     ::index idx
@@ -60,8 +60,8 @@
     (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor})
     (let [last-idx (dec (count data))]
       (ui/map->Vertical
-       {::ui/x        15 ;; overwritten when it's nested
-        ::ui/y        15
+       {::ui/x        10 ;; overwritten when it's nested
+        ::ui/y        10
         ::cursor      (= cursor path)
         ::tag         (collection-tag data)
         ::ui/children
@@ -115,8 +115,8 @@
     (if-not (get expanded path)
       (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor})
       (ui/map->Vertical
-       {::ui/x        15 ;;overwritten when it's nested
-        ::ui/y        15
+       {::ui/x        10 ;;overwritten when it's nested
+        ::ui/y        10
         ::cursor      (= cursor path)
         ::tag         (collection-tag data)
         ::ui/children
@@ -246,10 +246,10 @@
 
       :else nil)))
 
-(defn- mouse-clicked [{:keys [ui-atom] :as inspector} ^MouseEvent e]
+(defn- mouse-clicked [{:keys [ui-atom options-atom] :as inspector} ^MouseEvent e]
   (when-let [match (ui/component-at-point
                     {::ui/x (.getX e) ::ui/y (.getY e)}
-                    @ui-atom)]
+                    (ui/scale @ui-atom (::scale @options-atom)))] ;;scale so that clicks land correctly ;;TODO OPTIMIZE!!!
     (condp = (.getClickCount e)
       1 (swap-options! inspector assoc ::cursor (::path match))
       2 (when-not (= :atom (::tag match))
@@ -284,10 +284,8 @@
       KeyEvent/VK_S      (swap-options! inspector update ::show-indexes not)
 
       KeyEvent/VK_0      (swap-options! inspector update ::scale (constantly 1))
-      KeyEvent/VK_EQUALS (swap-options! inspector update ::scale #(+ % 0.2))
-      KeyEvent/VK_MINUS  (swap-options! inspector update ::scale #(let [s (- % 0.2)]
-                                                                    (if (< s 0.6)
-                                                                      0.7 s)))
+      KeyEvent/VK_EQUALS (swap-options! inspector update ::scale #(+ % 0.1))
+      KeyEvent/VK_MINUS  (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
       ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
       ;; \0 (reset! font-size default-font-size)
       ;; \= (swap! font-size inc)
@@ -311,8 +309,10 @@
          ui-atom       (atom (ui/layout (data->ui data [] options)))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [^Graphics2D g]
-                                 (let [ui (ui/scale @ui-atom (::scale @options-atom))]
+                                 (let [ui @ui-atom
+                                       f  (::scale @options-atom)]
                                    (doto g
+                                     (.scale f f)
                                      (.setColor ui/color-background)
                                      (.fillRect -2 -2
                                                 (+ 2 (.getWidth ^JPanel this))
@@ -327,11 +327,11 @@
      ;;connected atoms
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
-                  (swap! ui-atom (fn [_] (ui/layout (data->ui data [] @options-atom))))
+                  (swap! ui-atom (fn [_] (-> (data->ui data [] @options-atom) ui/layout)))
                   (.repaint frame)))
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ _ options]
-                  (swap! ui-atom (fn [_] (ui/layout (data->ui @data-atom [] options))))
+                  (swap! ui-atom (fn [_] (-> (data->ui data [] @options-atom) ui/layout)))
                   (.repaint frame)))
 
      ;;listeners

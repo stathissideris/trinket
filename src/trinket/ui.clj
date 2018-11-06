@@ -163,6 +163,7 @@
           (recur (zip/next loc)))))))
 
 (defn scale [ui factor]
+  (assert factor)
   (let [z (zipper ui)]
     (loop [loc z]
       (if (zip/end? loc)
