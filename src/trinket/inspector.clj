@@ -12,6 +12,7 @@
 (set! *warn-on-reflection* true)
 
 (def default-options {::cursor       []
+                      ::scale        1
                       ::show-indexes true})
 
 (defn- right-pad [^String s length]
@@ -267,20 +268,26 @@
   (let [expand-fn #(when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
                      (toggle-expansion! inspector (cursor inspector)))]
     (condp = (.getKeyCode e)
-      KeyEvent/VK_TAB   (expand-fn)
-      KeyEvent/VK_ENTER (if (.isShiftDown e)
-                          (move-cursor! inspector :in)
-                          (expand-fn))
-      KeyEvent/VK_LEFT  (move-cursor! inspector :left)
-      KeyEvent/VK_RIGHT (let [ui @ui-atom]
-                          (if (and (not (expanded? inspector (cursor inspector)))
-                                   (not= :atom (::tag (ui/find-component ui ::cursor))))
-                            (expand! inspector (cursor inspector))
-                            (move-cursor! inspector :right)))
-      KeyEvent/VK_UP    (move-cursor! inspector :up)
-      KeyEvent/VK_DOWN  (move-cursor! inspector :down)
+      KeyEvent/VK_TAB    (expand-fn)
+      KeyEvent/VK_ENTER  (if (.isShiftDown e)
+                           (move-cursor! inspector :in)
+                           (expand-fn))
+      KeyEvent/VK_LEFT   (move-cursor! inspector :left)
+      KeyEvent/VK_RIGHT  (let [ui @ui-atom]
+                           (if (and (not (expanded? inspector (cursor inspector)))
+                                    (not= :atom (::tag (ui/find-component ui ::cursor))))
+                             (expand! inspector (cursor inspector))
+                             (move-cursor! inspector :right)))
+      KeyEvent/VK_UP     (move-cursor! inspector :up)
+      KeyEvent/VK_DOWN   (move-cursor! inspector :down)
 
-      KeyEvent/VK_S     (swap-options! inspector update ::show-indexes not)
+      KeyEvent/VK_S      (swap-options! inspector update ::show-indexes not)
+
+      KeyEvent/VK_0      (swap-options! inspector update ::scale (constantly 1))
+      KeyEvent/VK_EQUALS (swap-options! inspector update ::scale #(+ % 0.2))
+      KeyEvent/VK_MINUS  (swap-options! inspector update ::scale #(let [s (- % 0.2)]
+                                                                    (if (< s 0.6)
+                                                                      0.7 s)))
       ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
       ;; \0 (reset! font-size default-font-size)
       ;; \= (swap! font-size inc)
@@ -304,10 +311,12 @@
          ui-atom       (atom (ui/layout (data->ui data [] options)))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [^Graphics2D g]
-                                 (let [ui @ui-atom]
+                                 (let [ui (ui/scale @ui-atom (::scale @options-atom))]
                                    (doto g
                                      (.setColor ui/color-background)
-                                     (.fillRect -2 -2 (+ 2 (.getWidth ^JPanel this)) (+ 2 (.getHeight ^JPanel this))))
+                                     (.fillRect -2 -2
+                                                (+ 2 (.getWidth ^JPanel this))
+                                                (+ 2 (.getHeight ^JPanel this))))
                                    (#'paint-cursor ui g)
                                    (ui/paint! ui g)))))
          frame         (doto (JFrame. "Trinket tree inspector")

@@ -8,6 +8,7 @@
 
 (def color-selection-background (-> (Color/decode "0x5ab2ec")
                                     .darker
+                                    .darker
                                     .darker))
 (def color-index Color/GRAY)
 (def color-background (Color/decode "0x282c34"))
@@ -160,3 +161,19 @@
         (if (pred (zip/node loc))
           (zip/node loc)
           (recur (zip/next loc)))))))
+
+(defn scale [ui factor]
+  (let [z (zipper ui)]
+    (loop [loc z]
+      (if (zip/end? loc)
+        (zip/root loc)
+        (let [{::keys [x y w h size] :as node :or {size default-font-size}} (zip/node loc)]
+          (->> (cond-> node
+                 x (assoc ::x (* factor x))
+                 y (assoc ::y (* factor y))
+                 w (assoc ::w (* factor w))
+                 h (assoc ::h (* factor h))
+                 size (assoc ::size (* factor size)))
+               (zip/replace loc)
+               zip/next
+               recur))))))
