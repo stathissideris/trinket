@@ -5,11 +5,11 @@ Clojure data inspector
 ##  Differences to clojure.inspector
 
 - The visual representation looks like EDN
-- You navigate data structures used as keys
 - Shows indexes
 - Shows laziness
 - You can select things at any level
 - Better keyboard support
+- You can navigate data structures used as keys
 
 ## TODO
 
