@@ -4,7 +4,7 @@
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
-  (:import [java.awt Toolkit Graphics2D]
+  (:import [java.awt Toolkit Graphics2D Dimension]
            [java.awt.event KeyListener KeyEvent MouseListener MouseEvent]
            [java.awt.datatransfer StringSelection]
            [javax.swing JPanel JFrame JScrollPane BorderFactory]))
@@ -340,7 +340,10 @@
                                                 (+ 2 (.getWidth ^JPanel this))
                                                 (+ 2 (.getHeight ^JPanel this))))
                                    (#'paint-cursor ui g)
-                                   (ui/paint! ui g)))))
+                                   (ui/paint! ui g)
+                                   (let [{::ui/keys [w h]} @ui-atom]
+                                     (.setPreferredSize ^JPanel this (Dimension. (* f w) (* f h))))
+                                   (.revalidate ^JPanel this)))))
          frame         (doto (JFrame. "Trinket tree inspector")
                          (.add (JScrollPane. panel))
                          (.setSize 400 600))
