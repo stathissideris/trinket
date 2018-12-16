@@ -345,7 +345,10 @@
                                      (.setPreferredSize ^JPanel this (Dimension. (* f w) (* f h))))
                                    (.revalidate ^JPanel this)))))
          frame         (doto (JFrame. "Trinket tree inspector")
-                         (.add (JScrollPane. panel))
+                         (.add (doto (JScrollPane. panel)
+                                 ((fn [sp]
+                                    (.setUnitIncrement (.getVerticalScrollBar sp) 16)
+                                    (.setUnitIncrement (.getHorizontalScrollBar sp) 8)))))
                          (.setSize 400 600))
          inspector     (->Inspector data-atom options-atom ui-atom frame)]
 
