@@ -340,10 +340,7 @@
                                                 (+ 2 (.getWidth ^JPanel this))
                                                 (+ 2 (.getHeight ^JPanel this))))
                                    (#'paint-cursor ui g)
-                                   (ui/paint! ui g)
-                                   (let [{::ui/keys [w h]} @ui-atom]
-                                     (.setPreferredSize ^JPanel this (Dimension. (* f w) (* f h))))
-                                   (.revalidate ^JPanel this)))))
+                                   (ui/paint! ui g)))))
          frame         (doto (JFrame. "Trinket tree inspector")
                          (.add (doto (JScrollPane. panel)
                                  ((fn [sp]
@@ -355,12 +352,18 @@
      ;;connected atoms
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
-                  (swap! ui-atom (fn [_] (-> (data->ui data [] @options-atom) ui/layout)))
-                  (.repaint frame)))
+                  (let [{::ui/keys [w h] :as new-ui} (-> (data->ui data [] @options-atom) ui/layout)]
+                    (.setPreferredSize ^JPanel this (Dimension. (* f w) (* f h)))
+                    (reset! ui-atom new-ui)
+                    (.revalidate panel)
+                    (.repaint frame))))
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ _ options]
-                  (swap! ui-atom (fn [_] (-> (data->ui data [] @options-atom) ui/layout)))
-                  (.repaint frame)))
+                  (let [{::ui/keys [w h] :as new-ui} (-> (data->ui @data-atom [] options) ui/layout)]
+                    (.setPreferredSize ^JPanel this (Dimension. (* f w) (* f h)))
+                    (reset! ui-atom new-ui)
+                    (.revalidate panel)
+                    (.repaint frame))))
 
      ;;listeners
      (doto panel
