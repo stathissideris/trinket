@@ -7,13 +7,14 @@
   (:import [java.awt Toolkit Graphics2D Dimension]
            [java.awt.event KeyListener KeyEvent MouseListener MouseEvent]
            [java.awt.datatransfer StringSelection]
-           [javax.swing JPanel JFrame JScrollPane BorderFactory]))
+           [javax.swing JPanel JFrame JScrollPane JScrollBar BorderFactory]))
 
 (set! *warn-on-reflection* true)
 
 (def default-options {::cursor       []
                       ::scale        1
-                      ::show-indexes true})
+                      ::show-indexes true
+                      ::page-length  10})
 
 (defn- right-pad [^String s length]
   (str s (apply str (repeat (- length (.length s)) " "))))
@@ -51,11 +52,13 @@
 (defn- indicate-lazy [ui]
   (ui/map->Horizontal {::ui/children [lazy-indicator ui]}))
 
-(defn atom->ui [{:keys [data text idx last-idx path cursor]}]
+(defn atom->ui [data path {::keys [text idx last-idx cursor page-length]}]
   (let [color (cond (keyword? data) ui/color-keywords
                     (string? data)  ui/color-strings
                     :else           ui/color-text)]
-    (cond-> (ui/text {::ui/text  (if text text (pr-str data))
+    (cond-> (ui/text {::ui/text  (if text text
+                                     (binding [*print-length* page-length]
+                                       (pr-str data)))
                       ::ui/x     10 ;;overwritten when it's nested
                       ::ui/y     10
                       ::ui/color color})
@@ -67,9 +70,11 @@
       (and cursor (= cursor path)) (assoc ::cursor true)
       (lazy? data) (indicate-lazy))))
 
-(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx] :as options}]
+(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx
+                                         suppress-indexes]
+                                 :as options}]
   (if-not (get expanded path)
-    (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor})
+    (atom->ui data path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))
     (let [last-idx (dec (count data))]
       (ui/map->Vertical
        {::ui/x        10 ;; overwritten when it's nested
@@ -89,24 +94,30 @@
                ;;value
                (ui/map->Horizontal
                 {::ui/children
-                 [(when show-indexes (ui/text {::ui/text  (str idx)
-                                               ::ui/size  8
-                                               ::ui/font  ui/font-regular
-                                               ::ui/color ui/color-index}))
-                  (if (get expanded value-path)
-                    (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
-                    (atom->ui {:data v :idx idx :last-idx last-idx :path value-path :cursor cursor}))]})
+                 [(when (and show-indexes
+                             (not suppress-indexes))
+                    (ui/text {::ui/text  (str idx)
+                              ::ui/size  8
+                              ::ui/font  ui/font-regular
+                              ::ui/color ui/color-index}))
+                  (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
+                    (if (get expanded value-path)
+                      (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
+                      (atom->ui v value-path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))))]})
 
                ;; closing
                (if (= idx last-idx)
                  (-> (ui/text closing) (assoc ::path path))
                  (ui/text " "))]})))}))))
 
-(defn lazy->ui [data path {::keys [cursor expanded idx last-idx] :as options}]
+(defn lazy->ui [data path {::keys [expanded page-length] :as options}]
   (if-not (get expanded path)
-    (indicate-lazy (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor}))
-    (let [last-idx (dec (count data))]
-      (indicate-lazy (sequential->ui data path options)))))
+    (atom->ui data path options)
+    (indicate-lazy (sequential->ui (take page-length data) path options))))
+
+(defmethod data->ui :atom
+  [data path options]
+  (atom->ui data path options))
 
 (defmethod data->ui :lazy-seq
   [data path options]
@@ -122,10 +133,9 @@
 
 (defmethod data->ui :set
   [data path options]
-  (sequential->ui data path
-                  (-> options
-                      (assoc ::opening "#{" ::closing "}" ::indent-str "  ")
-                      (dissoc ::show-indexes))))
+  (sequential->ui data path (assoc options
+                                   ::opening "#{" ::closing "}" ::indent-str "  "
+                                   ::suppress-indexes true)))
 
 (defmethod data->ui :map
   [data path {::keys [cursor expanded idx last-idx] :as options}]
@@ -135,7 +145,7 @@
         k->str   (update-vals k->str #(right-pad % longest))
         last-idx (dec (count data))]
     (if-not (get expanded path)
-      (atom->ui {:data data :idx idx :last-idx last-idx :path path :cursor cursor})
+      (atom->ui data path {::idx idx ::last-idx last-idx ::cursor cursor})
       (ui/map->Vertical
        {::ui/x        10 ;;overwritten when it's nested
         ::ui/y        10
@@ -154,15 +164,15 @@
 
                ;;key
                (if (get expanded key-path)
-                 (data->ui k key-path (assoc options :idx idx :last-idx last-idx))
-                 (atom->ui {:data k :text (k->str k) :idx idx :last-idx last-idx :path key-path :cursor cursor}))
+                 (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
+                 (data->ui k key-path (assoc options ::text (k->str k) ::idx idx ::last-idx last-idx ::cursor cursor)))
 
                (ui/text " ")
 
                ;;value
                (if (get expanded val-path)
-                 (data->ui v val-path (assoc options :idx idx :last-idx last-idx))
-                 (atom->ui {:data v :idx idx :last-idx last-idx :path val-path :cursor cursor}))
+                 (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
+                 (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor)))
 
                ;; closing
                (if (= idx last-idx)
@@ -344,23 +354,24 @@
          frame         (doto (JFrame. "Trinket tree inspector")
                          (.add (doto (JScrollPane. panel)
                                  ((fn [sp]
-                                    (.setUnitIncrement (.getVerticalScrollBar sp) 16)
-                                    (.setUnitIncrement (.getHorizontalScrollBar sp) 8)))))
+                                    (.setUnitIncrement (.getVerticalScrollBar ^JScrollPane sp) 16)
+                                    (.setUnitIncrement (.getHorizontalScrollBar ^JScrollPane sp) 8)))))
                          (.setSize 400 600))
          inspector     (->Inspector data-atom options-atom ui-atom frame)]
 
      ;;connected atoms
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
-                  (let [{::ui/keys [w h] :as new-ui} (-> (data->ui data [] @options-atom) ui/layout)]
-                    (.setPreferredSize ^JPanel this (Dimension. (* f w) (* f h)))
+                  (let [{::keys [scale] :as options} @options-atom
+                        {::ui/keys [w h] :as new-ui} (-> (data->ui data [] options) ui/layout)]
+                    (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)
                     (.repaint frame))))
      (add-watch options-atom ::inspector-ui
-                (fn [_ _ _ options]
+                (fn [_ _ _ {::keys [scale] :as options}]
                   (let [{::ui/keys [w h] :as new-ui} (-> (data->ui @data-atom [] options) ui/layout)]
-                    (.setPreferredSize ^JPanel this (Dimension. (* f w) (* f h)))
+                    (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)
                     (.repaint frame))))
@@ -443,7 +454,7 @@
               :bbbb          {:gg 88
                               :ffff 10}
               :ee            ["this is a vec" 1000 :foo "tt"]
-              :list          (map inc (range 10))
+              :list          (map inc (range 20))
               :set           #{"sets are nice too"
                                "sets are nice 3"
                                "sets are nice 4"}
