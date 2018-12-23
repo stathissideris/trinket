@@ -129,6 +129,15 @@
              ::w (apply max (map ::w new-children))
              ::h (apply + (map ::h new-children))))))
 
+(defrecord Grid []
+  Component
+  (paint! [this g]
+    (doseq [c (remove nil? (::children this))] (paint! c g)))
+  (ideal-size [this]
+    (layout this))
+  (layout [{::keys [x y children] :as this}]
+    (let [layouts ()])))
+
 (defn grow-bounds [{::keys [x y w h]} d]
   {::x (- x d)
    ::y (- y d)
