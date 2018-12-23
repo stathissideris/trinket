@@ -29,17 +29,18 @@
                (assoc m (fun k) v))
              {} m))
 
-(defn- lazy? [x] (instance? clojure.lang.LazySeq x))
+(defn- lazy? [x] (or (instance? clojure.lang.LazySeq x)
+                     (instance? clojure.lang.Cons x)))
 
 (defn collection-tag [x]
   (cond
-    (map? x)    :map
-    (set? x)    :set
-    (vector? x) :vector
-    (list? x)   :list
-    (string? x) :list
-    (lazy? x)   :lazy-seq
-    :else       :atom))
+    (map? x)                        :map
+    (set? x)                        :set
+    (vector? x)                     :vector
+    (list? x)                       :list
+    (string? x)                     :list
+    (lazy? x)                       :lazy-seq
+    :else                           :atom))
 
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
@@ -70,8 +71,9 @@
       (and cursor (= cursor path)) (assoc ::cursor true)
       (lazy? data) (indicate-lazy))))
 
-(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx
+(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx offset
                                          suppress-indexes]
+                                 :or {offset 0}
                                  :as options}]
   (if-not (get expanded path)
     (atom->ui data path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))
@@ -96,13 +98,13 @@
                 {::ui/children
                  [(when (and show-indexes
                              (not suppress-indexes))
-                    (ui/text {::ui/text  (str idx)
+                    (ui/text {::ui/text  (str (+ idx offset))
                               ::ui/size  8
                               ::ui/font  ui/font-regular
                               ::ui/color ui/color-index}))
                   (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
                     (if (get expanded value-path)
-                      (data->ui v value-path (dissoc options ::indent-str)) ;; no need to inherit this
+                      (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
                       (atom->ui v value-path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))))]})
 
                ;; closing
@@ -110,10 +112,14 @@
                  (-> (ui/text closing) (assoc ::path path))
                  (ui/text " "))]})))}))))
 
-(defn lazy->ui [data path {::keys [expanded page-length] :as options}]
+(defn lazy->ui [data path {::keys [expanded page-length lengths offsets] :as options}]
   (if-not (get expanded path)
     (atom->ui data path options)
-    (indicate-lazy (sequential->ui (take page-length data) path options))))
+    (let [offset         (get offsets path 0)
+          subseq-to-show (->> data
+                              (drop offset)
+                              (take (get lengths path page-length)))]
+      (indicate-lazy (sequential->ui subseq-to-show path (assoc options ::offset offset))))))
 
 (defmethod data->ui :atom
   [data path options]
@@ -300,24 +306,28 @@
   (let [expand-fn #(when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
                      (toggle-expansion! inspector (cursor inspector)))]
     (condp = (.getKeyCode e)
-      KeyEvent/VK_TAB    (expand-fn)
-      KeyEvent/VK_ENTER  (if (.isShiftDown e)
-                           (move-cursor! inspector :in)
-                           (expand-fn))
-      KeyEvent/VK_LEFT   (move-cursor! inspector :left)
-      KeyEvent/VK_RIGHT  (let [ui @ui-atom]
-                           (if (and (not (expanded? inspector (cursor inspector)))
-                                    (not= :atom (::tag (ui/find-component ui ::cursor))))
-                             (expand! inspector (cursor inspector))
-                             (move-cursor! inspector :right)))
-      KeyEvent/VK_UP     (move-cursor! inspector :up)
-      KeyEvent/VK_DOWN   (move-cursor! inspector :down)
+      KeyEvent/VK_TAB     (expand-fn)
+      KeyEvent/VK_ENTER   (if (.isShiftDown e)
+                            (move-cursor! inspector :in)
+                            (expand-fn))
 
-      KeyEvent/VK_S      (swap-options! inspector update ::show-indexes not)
+      KeyEvent/VK_COMMA   (swap-options! inspector update-in [::offsets (cursor inspector)] #(max 0 ((fnil dec 0) %)))
+      KeyEvent/VK_PERIOD  (swap-options! inspector update-in [::offsets (cursor inspector)] (fnil inc 0))
 
-      KeyEvent/VK_0      (swap-options! inspector update ::scale (constantly 1))
-      KeyEvent/VK_EQUALS (swap-options! inspector update ::scale #(+ % 0.1))
-      KeyEvent/VK_MINUS  (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
+      KeyEvent/VK_LEFT    (move-cursor! inspector :left)
+      KeyEvent/VK_RIGHT   (let [ui @ui-atom]
+                            (if (and (not (expanded? inspector (cursor inspector)))
+                                     (not= :atom (::tag (ui/find-component ui ::cursor))))
+                              (expand! inspector (cursor inspector))
+                              (move-cursor! inspector :right)))
+      KeyEvent/VK_UP      (move-cursor! inspector :up)
+      KeyEvent/VK_DOWN    (move-cursor! inspector :down)
+
+      KeyEvent/VK_S       (swap-options! inspector update ::show-indexes not)
+
+      KeyEvent/VK_0       (swap-options! inspector update ::scale (constantly 1))
+      KeyEvent/VK_EQUALS  (swap-options! inspector update ::scale #(+ % 0.1))
+      KeyEvent/VK_MINUS   (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
       ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
       ;; \0 (reset! font-size default-font-size)
       ;; \= (swap! font-size inc)
@@ -454,7 +464,8 @@
               :bbbb          {:gg 88
                               :ffff 10}
               :ee            ["this is a vec" 1000 :foo "tt"]
-              :list          (map inc (range 20))
+              :list          (map inc (range 100))
+              :code          (line-seq (clojure.java.io/reader "src/trinket/inspector.clj"))
               :set           #{"sets are nice too"
                                "sets are nice 3"
                                "sets are nice 4"}
