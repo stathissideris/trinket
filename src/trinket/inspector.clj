@@ -12,6 +12,7 @@
 (set! *warn-on-reflection* true)
 
 (def default-options {::cursor       []
+                      ::expanded     #{[]}
                       ::scale        1
                       ::show-indexes true
                       ::page-length  10})
@@ -302,32 +303,59 @@
     (mousePressed [e])
     (mouseReleased [e])))
 
-(defn- key-pressed [{:keys [ui-atom] :as inspector} ^KeyEvent e]
+(defn- is-shortcut-down? [^KeyEvent e]
+  (.isMetaDown e))
+
+
+(defn- safe-dec [x]
+  (max 0 ((fnil dec 0) x)))
+
+(def safe-inc (fnil inc 0))
+
+(defn- scroll-lazy! [inspector path fun]
+  (swap-options! inspector update-in [::offsets path] fun))
+
+(defn- show-less! [inspector path {::keys [page-length]}]
+  (swap-options! inspector update-in [::lengths path]
+                 (fn [x]
+                   (max 1 (dec (or x page-length))))))
+
+(defn- show-more! [inspector path {::keys [page-length]}]
+  (swap-options! inspector update-in [::lengths path]
+                 (fn [x]
+                   (inc (or x page-length)))))
+
+(defn- key-pressed [{:keys [ui-atom options-atom] :as inspector} ^KeyEvent e]
   (let [expand-fn #(when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
                      (toggle-expansion! inspector (cursor inspector)))]
     (condp = (.getKeyCode e)
-      KeyEvent/VK_TAB     (expand-fn)
-      KeyEvent/VK_ENTER   (if (.isShiftDown e)
-                            (move-cursor! inspector :in)
-                            (expand-fn))
+      KeyEvent/VK_TAB    (expand-fn)
+      KeyEvent/VK_ENTER  (if (.isShiftDown e)
+                           (move-cursor! inspector :in)
+                           (expand-fn))
 
-      KeyEvent/VK_COMMA   (swap-options! inspector update-in [::offsets (cursor inspector)] #(max 0 ((fnil dec 0) %)))
-      KeyEvent/VK_PERIOD  (swap-options! inspector update-in [::offsets (cursor inspector)] (fnil inc 0))
+      KeyEvent/VK_COMMA  (scroll-lazy! inspector (cursor inspector) safe-dec)
+      KeyEvent/VK_PERIOD (scroll-lazy! inspector (cursor inspector) safe-inc)
 
-      KeyEvent/VK_LEFT    (move-cursor! inspector :left)
-      KeyEvent/VK_RIGHT   (let [ui @ui-atom]
-                            (if (and (not (expanded? inspector (cursor inspector)))
-                                     (not= :atom (::tag (ui/find-component ui ::cursor))))
-                              (expand! inspector (cursor inspector))
-                              (move-cursor! inspector :right)))
-      KeyEvent/VK_UP      (move-cursor! inspector :up)
-      KeyEvent/VK_DOWN    (move-cursor! inspector :down)
+      KeyEvent/VK_LEFT   (move-cursor! inspector :left)
+      KeyEvent/VK_RIGHT  (let [ui @ui-atom]
+                           (if (and (not (expanded? inspector (cursor inspector)))
+                                    (not= :atom (::tag (ui/find-component ui ::cursor))))
+                             (expand! inspector (cursor inspector))
+                             (move-cursor! inspector :right)))
+      KeyEvent/VK_UP     (move-cursor! inspector :up)
+      KeyEvent/VK_DOWN   (move-cursor! inspector :down)
 
-      KeyEvent/VK_S       (swap-options! inspector update ::show-indexes not)
+      KeyEvent/VK_S      (swap-options! inspector update ::show-indexes not)
 
-      KeyEvent/VK_0       (swap-options! inspector update ::scale (constantly 1))
-      KeyEvent/VK_EQUALS  (swap-options! inspector update ::scale #(+ % 0.1))
-      KeyEvent/VK_MINUS   (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
+      KeyEvent/VK_0      (when (is-shortcut-down? e)
+                           (swap-options! inspector update ::scale (constantly 1)))
+      KeyEvent/VK_EQUALS (if (is-shortcut-down? e)
+                           (swap-options! inspector update ::scale #(+ % 0.1))
+                           (show-more! inspector (cursor inspector) @options-atom))
+      KeyEvent/VK_MINUS  (if (is-shortcut-down? e)
+                           (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
+                           (show-less! inspector (cursor inspector) @options-atom))
       ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
       ;; \0 (reset! font-size default-font-size)
       ;; \= (swap! font-size inc)
