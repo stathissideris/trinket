@@ -153,7 +153,7 @@
         k->str   (update-vals k->str #(right-pad % longest))
         last-idx (dec (count data))]
     (if-not (get expanded path)
-      (atom->ui data path {::idx idx ::last-idx last-idx ::cursor cursor})
+      (atom->ui data path options)
       (ui/map->Vertical
        {::ui/x        10 ;;overwritten when it's nested
         ::ui/y        10
