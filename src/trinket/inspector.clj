@@ -113,14 +113,18 @@
                  (-> (ui/text closing) (assoc ::path path))
                  (ui/text " "))]})))}))))
 
+(defn- data-page [data path {::keys [page-length lengths offsets] :as options}]
+  (let [offset (get offsets path 0)]
+    {:offset offset
+     :data   (->> data
+                  (drop offset)
+                  (take (get lengths path page-length)))}))
+
 (defn lazy->ui [data path {::keys [expanded page-length lengths offsets] :as options}]
   (if-not (get expanded path)
     (atom->ui data path options)
-    (let [offset         (get offsets path 0)
-          subseq-to-show (->> data
-                              (drop offset)
-                              (take (get lengths path page-length)))]
-      (indicate-lazy (sequential->ui subseq-to-show path (assoc options ::offset offset))))))
+    (let [{:keys [data offset]} (data-page data path options)]
+      (indicate-lazy (sequential->ui data path (assoc options ::offset offset))))))
 
 (defmethod data->ui :atom
   [data path options]
