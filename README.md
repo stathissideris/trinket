@@ -7,6 +7,8 @@ Clojure data inspector
 - The visual representation looks like EDN
 - Shows indexes
 - Shows laziness
+- Limited realization of lazy sequences and ability to scroll through
+  them and/or show a larger portion of them.
 - You can select things at any level
 - Better keyboard support
 - You can navigate data structures used as keys
@@ -17,7 +19,8 @@ Clojure data inspector
       what happens if you expand the last item)
 - [ ] Take into account expansion state when doing layout (see what
       happens when you expand a key that is a map)
-- [ ] Place cursor at root of data when starting
+- [x] Place cursor at root of data when starting
+- [ ] Realize lazy seqs in the background
 
 ## How to address both keys and values in nested data structures
 
