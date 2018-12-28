@@ -21,6 +21,10 @@ Clojure data inspector
       happens when you expand a key that is a map)
 - [x] Place cursor at root of data when starting
 - [ ] Realize lazy seqs in the background
+- [ ] Scroll to follow cursor
+- [ ] Don't draw outside visible area
+- [ ] Table view
+- [ ] Customisable keys
 
 ## How to address both keys and values in nested data structures
 
@@ -39,7 +43,7 @@ In: [:xx 1] val: "" fails spec: :trinket.inspector/b at: [1] predicate: map?
 In: ["wrong" 0] val: "wrong" fails spec: :trinket.inspector/a at: [0] predicate: keyword?
 ```
 
-Copyright © 2018 Stathis Sideris
+Copyright © 2018-2019 Stathis Sideris
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
