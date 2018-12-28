@@ -95,10 +95,12 @@
   {::x (+ x (or w 0)) ::y y})
 
 (defn linear-arrange [children {::keys [x y] :as parent} next-pos]
-  (let [first-c (-> children first (assoc ::x x ::y y) layout)]
-    (reduce (fn [children child]
-              (conj children (layout (merge child (next-pos (last children))))))
-            [first-c] (rest children))))
+  (if (empty? children)
+    children
+    (let [first-c (-> children first (assoc ::x x ::y y) layout)]
+      (reduce (fn [children child]
+                (conj children (layout (merge child (next-pos (last children))))))
+              [first-c] (rest children)))))
 
 (defrecord Horizontal []
   Component
@@ -107,11 +109,14 @@
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
-    (let [new-children (linear-arrange (remove nil? children) this right-of)]
-      (assoc this
-             ::children new-children
-             ::w (apply + (map ::w new-children))
-             ::h (apply max (map ::h new-children))))))
+    (let [children (remove nil? children)]
+      (if (empty? children)
+        (assoc this ::w 0 ::h 0)
+        (let [new-children (linear-arrange children this right-of)]
+          (assoc this
+                 ::children new-children
+                 ::w (apply + (map ::w new-children))
+                 ::h (apply max (map ::h new-children))))))))
 
 (defn below-of [{::keys [x y h]}]
   {::x x ::y (+ y (or h 0))})
@@ -123,11 +128,14 @@
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
-    (let [new-children (linear-arrange (remove nil? children) this below-of)]
-      (assoc this
-             ::children new-children
-             ::w (apply max (map ::w new-children))
-             ::h (apply + (map ::h new-children))))))
+    (let [children (remove nil? children)]
+      (if (empty? children)
+        (assoc this ::w 0 ::h 0)
+        (let [new-children (linear-arrange children this below-of)]
+          (assoc this
+                 ::children new-children
+                 ::w (apply max (map ::w new-children))
+                 ::h (apply + (map ::h new-children))))))))
 
 (defrecord Grid []
   Component

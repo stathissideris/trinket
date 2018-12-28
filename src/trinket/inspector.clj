@@ -69,8 +69,7 @@
                      ::tag (collection-tag data))
       (and idx (zero? idx)) (assoc ::first true)
       (and idx (= idx last-idx)) (assoc ::last true)
-      (and cursor (= cursor path)) (assoc ::cursor true)
-      (lazy? data) (indicate-lazy))))
+      (and cursor (= cursor path)) (assoc ::cursor true))))
 
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx offset
                                          suppress-indexes]
@@ -121,10 +120,8 @@
                   (take (get lengths path page-length)))}))
 
 (defn lazy->ui [data path {::keys [expanded page-length lengths offsets] :as options}]
-  (if-not (get expanded path)
-    (atom->ui data path options)
-    (let [{:keys [data offset]} (data-page data path options)]
-      (indicate-lazy (sequential->ui data path (assoc options ::offset offset))))))
+  (let [{:keys [data offset]} (data-page data path options)]
+    (indicate-lazy (sequential->ui data path (assoc options ::offset offset)))))
 
 (defmethod data->ui :atom
   [data path options]
@@ -316,7 +313,7 @@
 
 (def safe-inc (fnil inc 0))
 
-(defn- scroll-lazy! [inspector path fun]
+(defn- scroll-seq! [inspector path fun]
   (swap-options! inspector update-in [::offsets path] fun))
 
 (defn- show-less! [inspector path {::keys [page-length]}]
@@ -338,8 +335,8 @@
                            (move-cursor! inspector :in)
                            (expand-fn))
 
-      KeyEvent/VK_COMMA  (scroll-lazy! inspector (cursor inspector) safe-dec)
-      KeyEvent/VK_PERIOD (scroll-lazy! inspector (cursor inspector) safe-inc)
+      KeyEvent/VK_COMMA  (scroll-seq! inspector (cursor inspector) safe-dec)
+      KeyEvent/VK_PERIOD (scroll-seq! inspector (cursor inspector) safe-inc)
 
       KeyEvent/VK_LEFT   (move-cursor! inspector :left)
       KeyEvent/VK_RIGHT  (let [ui @ui-atom]
@@ -491,20 +488,20 @@
               "bar"
               "baz"]))
 
-  (def ins
-    (inspect {:a             10000
-              :bbbb          {:gg 88
-                              :ffff 10}
-              :ee            ["this is a vec" 1000 :foo "tt"]
-              :list          (map inc (range 100))
-              :code          (line-seq (clojure.java.io/reader "src/trinket/inspector.clj"))
-              :set           #{"sets are nice too"
-                               "sets are nice 3"
-                               "sets are nice 4"}
-              {:map "keys"
-               :are "handled"
-               :as  "well!"} "yay!"
-              :ccccc         "This is a test"}))
+  (def the-data
+    {:a             10000
+     :bbbb          {:gg 88
+                     :ffff 10}
+     :ee            ["this is a vec" 1000 :foo "tt"]
+     :list          (map inc (range 20))
+     :code          (line-seq (clojure.java.io/reader "src/trinket/inspector.clj"))
+     :set           #{"sets are nice too"
+                      "sets are nice 3"
+                      "sets are nice 4"}
+     {:map "keys"
+      :are "handled"
+      :as  "well!"} "yay!"
+     :ccccc         "This is a test"})
 
 
   (set-data! ins {:a     10000
