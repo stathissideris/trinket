@@ -147,13 +147,13 @@
 
 (defmethod data->ui :map
   [data path {::keys [cursor expanded idx last-idx] :as options}]
-  (let [k->str   (zipmap (keys data)
-                         (map pr-str (keys data)))
-        longest  (apply max (map count (vals k->str)))
-        k->str   (update-vals k->str #(right-pad % longest))
-        last-idx (dec (count data))]
-    (if-not (get expanded path)
-      (atom->ui data path options)
+  (if-not (get expanded path)
+    (atom->ui data path options)
+    (let [k->str   (zipmap (keys data)
+                           (map pr-str (keys data)))
+          longest  (apply max (map count (vals k->str)))
+          k->str   (update-vals k->str #(right-pad % longest))
+          last-idx (dec (count data))]
       (ui/map->Vertical
        {::ui/x        10 ;;overwritten when it's nested
         ::ui/y        10
