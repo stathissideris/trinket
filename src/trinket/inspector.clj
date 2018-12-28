@@ -377,7 +377,7 @@
   ([data options]
    (let [data-atom     (atom data)
          options-atom  (atom (merge default-options options))
-         ui-atom       (atom (ui/layout (data->ui data [] options)))
+         ui-atom       (atom (ui/layout (data->ui data [] @options-atom)))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [^Graphics2D g]
                                  (let [ui @ui-atom
