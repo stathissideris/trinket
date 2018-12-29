@@ -154,38 +154,36 @@
           longest  (apply max (map count (vals k->str)))
           k->str   (update-vals k->str #(right-pad % longest))
           last-idx (dec (count data))]
-      (ui/map->Vertical
+      (ui/map->Grid
        {::ui/x        10 ;;overwritten when it's nested
         ::ui/y        10
         ::cursor      (= cursor path)
         ::tag         (collection-tag data)
-        ::ui/children
+        ::ui/rows
         (for [[idx [k v]] (map-indexed vector data)]
           (let [key-path (conj path idx ::path/key)
                 val-path (conj path idx ::path/val)]
-            (ui/map->Horizontal
-             {::ui/children
-              [ ;;opening
-               (if (zero? idx)
-                 (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
-                 (ui/text " "))
+            [ ;;opening
+             (if (zero? idx)
+               (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
+               (ui/text " "))
 
-               ;;key
-               (if (get expanded key-path)
-                 (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
-                 (data->ui k key-path (assoc options ::text (k->str k) ::idx idx ::last-idx last-idx ::cursor cursor)))
+             ;;key
+             (if (get expanded key-path)
+               (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
+               (data->ui k key-path (assoc options ::text (k->str k) ::idx idx ::last-idx last-idx ::cursor cursor)))
 
-               (ui/text " ")
+             (ui/text " ")
 
-               ;;value
-               (if (get expanded val-path)
-                 (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
-                 (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor)))
+             ;;value
+             (if (get expanded val-path)
+               (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
+               (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor)))
 
-               ;; closing
-               (if (= idx last-idx)
-                 (-> (ui/text "}") (assoc ::path path))
-                 (ui/text " "))]})))}))))
+             ;; closing
+             (if (= idx last-idx)
+               (-> (ui/text "}") (assoc ::path path))
+               (ui/text " "))]))}))))
 
 (defn paint-cursor [ui ^Graphics2D g]
   (when-let [match (ui/find-component ui ::cursor)]
@@ -535,4 +533,9 @@
                     :inner5 20
                     :inner6 20}
             :ccccc "This is a test"})
+
+  (def ins
+    (inspect {:a     [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19]
+              :bbbb  3
+              :ccccc "This is a test"}))
   )

@@ -31,6 +31,15 @@
   (ideal-size [this])
   (layout [this]))
 
+(extend-type Object
+  Component
+  (paint! [this g]
+    (throw (ex-info "paint! not implemented for object" {:object this :type (type this)})))
+  (ideal-size [this]
+    (throw (ex-info "ideal-size not implemented for object" {:object this :type (type this)})))
+  (layout [this]
+    (throw (ex-info "layout not implemented for object" {:object this :type (type this)}))))
+
 (defn set-bounds! [^JComponent c {::keys [x y w h]}]
   (.setBounds c x y w h))
 
@@ -95,6 +104,10 @@
   {::x (+ x (or w 0)) ::y y})
 
 (defn linear-arrange [children {::keys [x y] :as parent} next-pos]
+  (when-not (and x y)
+    (throw (ex-info "Unable to do linear arrange - parent has no position info"
+                    {:parent   parent
+                     :children children})))
   (if (empty? children)
     children
     (let [first-c (-> children first (assoc ::x x ::y y) layout)]
@@ -137,14 +150,48 @@
                  ::w (apply max (map ::w new-children))
                  ::h (apply + (map ::h new-children))))))))
 
+(defn- transpose [rows]
+  (apply map vector rows))
+
+(defn safe-max [& args]
+  (if (empty? args)
+    []
+    (apply max args)))
+
 (defrecord Grid []
   Component
-  (paint! [this g]
-    (doseq [c (remove nil? (::children this))] (paint! c g)))
+  (paint! [{::keys [rows] :as this} g]
+    (doseq [row rows]
+      (doseq [child row]
+        (paint! child g))))
   (ideal-size [this]
     (layout this))
-  (layout [{::keys [x y children] :as this}]
-    (let [layouts ()])))
+  (layout [{::keys [x y rows] :as this}]
+    (when-not (and x y)
+      (throw (ex-info "Unable to arrange in a grid - parent has no position info"
+                      {:parent this
+                       :rows   rows})))
+    (let [rows          (for [row rows]
+                          (for [child row]
+                            (layout child)))
+
+          column-widths (mapv #(apply safe-max (map ::w %)) (transpose rows))
+          x-positions   (vec (reductions + x column-widths))
+
+          row-heights   (mapv #(apply safe-max (map ::h %)) rows)
+          y-positions   (vec (reductions + y row-heights))]
+
+      (assoc this
+             ::w (apply + column-widths)
+             ::h (apply + row-heights)
+             ::rows
+             (for [[r-idx row] (map-indexed vector rows)]
+               (for [[c-idx child] (map-indexed vector row)]
+                 (let [x (get x-positions c-idx)
+                       y (get y-positions r-idx)
+                       w (get column-widths c-idx)
+                       h (get row-heights r-idx)]
+                   (assoc child ::x x ::y y ::w w ::h h))))))))
 
 (defn grow-bounds [{::keys [x y w h]} d]
   {::x (- x d)
@@ -152,8 +199,14 @@
    ::w (+ w (* 2 d))
    ::h (+ h (* 2 d))})
 
+(defn- get-children [x]
+  (or (::children x)
+      (flatten (::rows x))))
+
 (defn zipper [elem]
-  (zip/zipper ::children ::children #(assoc %1 ::children %2) elem))
+  (zip/zipper (some-fn ::children ::rows)
+              get-children
+              #(assoc %1 ::children %2) elem))
 
 (defn point-within? [{px ::x py ::y} {::keys [x y w h]}]
   (and (<= x px (+ x w))
