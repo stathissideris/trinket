@@ -25,6 +25,10 @@ Clojure data inspector
 - [ ] Don't draw outside visible area
 - [ ] Table view
 - [ ] Customisable keys
+- [ ] Move drop/take code for paging lazy sequences out of drawing
+      code and into the event loop. This will allow us to constrain
+      scrolling to not go beyond the end of the sequence. Also,
+      drawing code should be very lightweight.
 
 ## How to address both keys and values in nested data structures
 
