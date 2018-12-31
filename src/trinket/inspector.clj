@@ -61,8 +61,6 @@
     (cond-> (ui/text {::ui/text  (if text text
                                      (binding [*print-length* page-length]
                                        (pr-str data)))
-                      ::ui/x     10 ;;overwritten when it's nested
-                      ::ui/y     10
                       ::ui/color color})
       :always (assoc ::path path
                      ::index idx
@@ -79,9 +77,7 @@
     (atom->ui data path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))
     (let [last-idx (dec (count data))]
       (ui/map->Vertical
-       {::ui/x        10 ;; overwritten when it's nested
-        ::ui/y        10
-        ::cursor      (= cursor path)
+       {::cursor      (= cursor path)
         ::tag         (collection-tag data)
         ::ui/children
         (for [[idx v] (map-indexed vector data)]
@@ -94,18 +90,19 @@
                  (ui/text (or indent-str " ")))
 
                ;;value
-               (ui/map->Horizontal
-                {::ui/children
-                 [(when (and show-indexes
-                             (not suppress-indexes))
-                    (ui/text {::ui/text  (str (+ idx offset))
-                              ::ui/size  8
-                              ::ui/font  ui/font-regular
-                              ::ui/color ui/color-index}))
-                  (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
-                    (if (get expanded value-path)
-                      (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
-                      (atom->ui v value-path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))))]})
+               (let [value-ui (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
+                                (if (get expanded value-path)
+                                  (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
+                                  (atom->ui v value-path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))))]
+                 (if (and show-indexes (not suppress-indexes))
+                   (ui/map->Horizontal
+                    {::ui/children
+                     [(ui/text {::ui/text  (str (+ idx offset))
+                                ::ui/size  8
+                                ::ui/font  ui/font-regular
+                                ::ui/color ui/color-index})
+                      value-ui]})
+                   value-ui))
 
                ;; closing
                (if (= idx last-idx)
@@ -155,10 +152,8 @@
           k->str   (update-vals k->str #(right-pad % longest))
           last-idx (dec (count data))]
       (ui/map->Grid
-       {::ui/x        10 ;;overwritten when it's nested
-        ::ui/y        10
-        ::cursor      (= cursor path)
-        ::tag         (collection-tag data)
+       {::cursor  (= cursor path)
+        ::tag     (collection-tag data)
         ::ui/rows
         (for [[idx [k v]] (map-indexed vector data)]
           (let [key-path (conj path idx ::path/key)
@@ -375,7 +370,7 @@
   ([data options]
    (let [data-atom     (atom data)
          options-atom  (atom (merge default-options options))
-         ui-atom       (atom (ui/layout (data->ui data [] @options-atom)))
+         ui-atom       (atom (-> (data->ui data [] @options-atom) (assoc ::ui/x 10 ::ui/y 10) ui/layout))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [^Graphics2D g]
                                  (let [ui @ui-atom
@@ -400,14 +395,14 @@
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
                   (let [{::keys [scale] :as options} @options-atom
-                        {::ui/keys [w h] :as new-ui} (-> (data->ui data [] options) ui/layout)]
+                        {::ui/keys [w h] :as new-ui} (-> (data->ui data [] options) (assoc ::ui/x 10 ::ui/y 10) ui/layout)]
                     (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)
                     (.repaint frame))))
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ _ {::keys [scale] :as options}]
-                  (let [{::ui/keys [w h] :as new-ui} (-> (data->ui @data-atom [] options) ui/layout)]
+                  (let [{::ui/keys [w h] :as new-ui} (-> (data->ui @data-atom [] options) (assoc ::ui/x 10 ::ui/y 10) ui/layout)]
                     (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)
@@ -425,24 +420,6 @@
 
 
 (comment
-  (ui/layout (ui/text "foo"))
-  (ui/layout (ui/map->Horizontal
-              {::ui/x 15 ::ui/y 15
-               ::ui/children [(ui/text "foo")
-                              (ui/text "fo")
-                              (ui/text "f")]}))
-  (ui/layout (ui/map->Vertical
-              {::ui/x 15 ::ui/y 15
-               ::ui/children [(ui/text "foo")
-                              (ui/text "fo")
-                              (ui/text "f")]}))
-  (ui/layout
-   (data->ui {:a     10
-              :bbbb  20}))
-  (ui/layout
-   (data->ui {:a     10
-              :bbbb  20
-              :ccccc "This is a test"}))
   (inspect {:a     10000
             :bbbb  20
             :ccccc "This is a test"})
@@ -535,7 +512,5 @@
             :ccccc "This is a test"})
 
   (def ins
-    (inspect {:a     [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19]
-              :bbbb  3
-              :ccccc "This is a test"}))
-  )
+    (inspect {:a     [0 1 2 3]}))
+)

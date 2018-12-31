@@ -106,8 +106,7 @@
 (defn linear-arrange [children {::keys [x y] :as parent} next-pos]
   (when-not (and x y)
     (throw (ex-info "Unable to do linear arrange - parent has no position info"
-                    {:parent   parent
-                     :children children})))
+                    {:component parent})))
   (if (empty? children)
     children
     (let [first-c (-> children first (assoc ::x x ::y y) layout)]
@@ -169,11 +168,10 @@
   (layout [{::keys [x y rows] :as this}]
     (when-not (and x y)
       (throw (ex-info "Unable to arrange in a grid - parent has no position info"
-                      {:parent this
-                       :rows   rows})))
+                      {:component this})))
     (let [rows          (for [row rows]
                           (for [child row]
-                            (layout child)))
+                            (ideal-size child)))
 
           column-widths (mapv #(apply safe-max (map ::w %)) (transpose rows))
           x-positions   (vec (reductions + x column-widths))
