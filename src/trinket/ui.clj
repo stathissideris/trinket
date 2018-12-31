@@ -212,9 +212,9 @@
             zip/next
             recur)))))
 
-(defn point-within? [{px ::x py ::y} {::keys [x y w h]}]
-  (and (<= x px (+ x w))
-       (<= y py (+ y h))))
+(defn point-within? [{px ::x py ::y} {::keys [ax ay w h]}]
+  (and (<= ax px (+ ax w))
+       (<= ay py (+ ay h))))
 
 (defn component-at-point [point ui]
   (let [z       (zipper ui)

@@ -45,11 +45,13 @@
 
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
-(def lazy-indicator
-  (ui/text {::ui/text  "L"
+(defn annotation [x]
+  (ui/text {::ui/text  x
             ::ui/size  8
             ::ui/font  ui/font-regular
             ::ui/color ui/color-index}))
+
+(def lazy-indicator (annotation "L"))
 
 (defn- indicate-lazy [ui]
   (ui/map->Horizontal {::ui/children [lazy-indicator ui]}))
@@ -69,45 +71,61 @@
       (and idx (= idx last-idx)) (assoc ::last true)
       (and cursor (= cursor path)) (assoc ::cursor true))))
 
+(defn- tabular-data? [data]
+  (every? map? data))
+
+(defn- data-table [data options]
+  (let [total-keys (sort (distinct (mapcat keys data)))]
+    (ui/map->Vertical
+     {::ui/children
+      [(annotation "TABLE")
+       (ui/map->Grid
+        {::ui/columns (count total-keys)
+         ::ui/children
+         (concat (map ui/text total-keys)
+                 (mapcat (fn [row] (map #(ui/text (get row %)) total-keys)) data))})]})))
+
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx offset
-                                         suppress-indexes]
+                                         suppress-indexes tables]
                                  :or {offset 0}
                                  :as options}]
-  (if-not (get expanded path)
-    (atom->ui data path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))
-    (let [last-idx (dec (count data))]
-      (ui/map->Vertical
-       {::cursor      (= cursor path)
-        ::tag         (collection-tag data)
-        ::ui/children
-        (for [[idx v] (map-indexed vector data)]
-          (let [value-path (conj path idx)]
-            (ui/map->Horizontal
-             {::ui/children
-              [ ;;opening
-               (if (zero? idx)
-                 (-> (ui/text opening) (assoc ::path path)) ;; assoc path to allow mouse selection of whole map
-                 (ui/text (or indent-str " ")))
+  (cond (not (get expanded path))
+        (atom->ui data path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))
 
-               ;;value
-               (let [value-ui (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
-                                (if (get expanded value-path)
-                                  (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
-                                  (atom->ui v value-path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))))]
-                 (if (and show-indexes (not suppress-indexes))
-                   (ui/map->Horizontal
-                    {::ui/children
-                     [(ui/text {::ui/text  (str (+ idx offset))
-                                ::ui/size  8
-                                ::ui/font  ui/font-regular
-                                ::ui/color ui/color-index})
-                      value-ui]})
-                   value-ui))
+        (and (get tables path) (tabular-data? data))
+        (data-table data options)
 
-               ;; closing
-               (if (= idx last-idx)
-                 (-> (ui/text closing) (assoc ::path path))
-                 (ui/text " "))]})))}))))
+        :else
+        (let [last-idx (dec (count data))]
+          (ui/map->Vertical
+           {::cursor      (= cursor path)
+            ::tag         (collection-tag data)
+            ::ui/children
+            (for [[idx v] (map-indexed vector data)]
+              (let [value-path (conj path idx)]
+                (ui/map->Horizontal
+                 {::ui/children
+                  [ ;;opening
+                   (if (zero? idx)
+                     (-> (ui/text opening) (assoc ::path path)) ;; assoc path to allow mouse selection of whole map
+                     (ui/text (or indent-str " ")))
+
+                   ;;value
+                   (let [value-ui (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
+                                    (if (get expanded value-path)
+                                      (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
+                                      (atom->ui v value-path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))))]
+                     (if (and show-indexes (not suppress-indexes))
+                       (ui/map->Horizontal
+                        {::ui/children
+                         [(annotation (str (+ idx offset)))
+                          value-ui]})
+                       value-ui))
+
+                   ;; closing
+                   (if (= idx last-idx)
+                     (-> (ui/text closing) (assoc ::path path))
+                     (ui/text " "))]})))}))))
 
 (defn- data-page [data path {::keys [page-length lengths offsets] :as options}]
   (let [offset (get offsets path 0)]
@@ -326,6 +344,14 @@
                            (move-cursor! inspector :in)
                            (expand-fn))
 
+      KeyEvent/VK_T      (swap-options! inspector update ::tables
+                                        (fn [tables]
+                                          (let [path   (cursor inspector)
+                                                tables (or tables #{})]
+                                            (if (get tables path)
+                                              (disj tables path)
+                                              (conj tables path)))))
+
       KeyEvent/VK_COMMA  (scroll-seq! inspector (cursor inspector) safe-dec)
       KeyEvent/VK_PERIOD (scroll-seq! inspector (cursor inspector) safe-inc)
 
@@ -450,22 +476,49 @@
                :as  "well!"} "yay!"
               :ccccc         "This is a test"}))
 
-  (def ins
-    (inspect ["foo"
-              {:a             10000
-               :bbbb          {:gg 88
-                               :ffff 10}
-               :ee            ["this is a vec" 1000 :foo "tt"]
-               :list          (list "this is a list" 4000 :foo "tt")
-               :set           #{"sets are nice too"
-                                "sets are nice 3"
-                                "sets are nice 4"}
-               {:map "keys"
-                :are "handled"
-                :as  "well!"} "yay!"
-               :ccccc         "This is a test"}
-              "bar"
-              "baz"]))
+  (def the-data
+    ["foo"
+     [{:name "Stathis" :surname "Sideris" :activity "coding"}
+      {:name "Tom" :surname "Waits" :activity "music"}
+      {:name "Adam" :surname "Harris" :activity "music"}
+      {:name "Nick" :surname "Nolte" :activity "music"}
+      {:name "Cecil" :surname "Adams" :activity "music"}
+      {:name "Salvador" :surname "Dali" :activity "music"}
+      {:name "Speedy0" :surname "Gonzales0" :activity "music"}
+      {:name "Speedy1" :surname "Gonzales1" :activity "music"}
+      {:name "Speedy2" :surname "Gonzales2" :activity "music"}
+      {:name "Speedy3" :surname "Gonzales3" :activity "music"}
+      {:name "Speedy4" :surname "Gonzales4" :activity "music"}
+      {:name "Speedy5" :surname "Gonzales5" :activity "music"}
+      {:name "Speedy6" :surname "Gonzales6" :activity "music"}
+      {:name "Speedy7" :surname "Gonzales7" :activity "music"}
+      {:name "Speedy8" :surname "Gonzales8" :activity "music"}
+      {:name "Speedy9" :surname "Gonzales9" :activity "music"}
+      {:name "Speedy10" :surname "Gonzales10" :activity "music"}
+      {:name "Speedy11" :surname "Gonzales11" :activity "music"}
+      {:name "Speedy12" :surname "Gonzales12" :activity "music"}
+      {:name "Speedy13" :surname "Gonzales13" :activity "music"}
+      {:name "Speedy14" :surname "Gonzales14" :activity "music"}
+      {:name "Speedy15" :surname "Gonzales15" :activity "music"}
+      {:name "Speedy16" :surname "Gonzales16" :activity "music"}
+      {:name "Speedy17" :surname "Gonzales17" :activity "music"}
+      {:name "Speedy18" :surname "Gonzales18" :activity "music"}
+      {:name "Speedy19" :surname "Gonzales19" :activity "music"}]])
+
+  (def the-data
+    {:a             10000
+     :bbbb          {:gg 88
+                     :ffff 10}
+     :ee            ["this is a vec" 1000 :foo "tt"]
+     :list          (map inc (range 20))
+     :code          (line-seq (clojure.java.io/reader "src/trinket/inspector.clj"))
+     :set           #{"sets are nice too"
+                      "sets are nice 3"
+                      "sets are nice 4"}
+     {:map "keys"
+      :are "handled"
+      :as  "well!"} "yay!"
+     :ccccc         "This is a test"})
 
   (def the-data
     {:a             10000
@@ -517,4 +570,5 @@
 
   (def ins (inspect {:a [0 1 2 3]}))
   (def ins (inspect the-data))
+
 )
