@@ -512,5 +512,5 @@
             :ccccc "This is a test"})
 
   (def ins
-    (inspect {:a     [0 1 2 3]}))
+    (inspect {:a [0 1 2 3]}))
 )

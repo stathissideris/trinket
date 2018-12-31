@@ -103,28 +103,28 @@
 (defn right-of [{::keys [x y w]}]
   {::x (+ x (or w 0)) ::y y})
 
-(defn linear-arrange [children {::keys [x y] :as parent} next-pos]
-  (when-not (and x y)
-    (throw (ex-info "Unable to do linear arrange - parent has no position info"
-                    {:component parent})))
+(defn linear-arrange [children next-pos]
   (if (empty? children)
     children
-    (let [first-c (-> children first (assoc ::x x ::y y) layout)]
+    (let [first-c (-> children first (assoc ::x 0 ::y 0) layout)]
       (reduce (fn [children child]
                 (conj children (layout (merge child (next-pos (last children))))))
               [first-c] (rest children)))))
 
 (defrecord Horizontal []
   Component
-  (paint! [this g]
-    (doseq [c (remove nil? (::children this))] (paint! c g)))
+  (paint! [{::keys [x y children] :as this} g]
+    (save-transform
+     g
+     (.translate g (double x) (double y))
+     (doseq [c (remove nil? children)] (paint! c g))))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
     (let [children (remove nil? children)]
       (if (empty? children)
         (assoc this ::w 0 ::h 0)
-        (let [new-children (linear-arrange children this right-of)]
+        (let [new-children (linear-arrange children right-of)]
           (assoc this
                  ::children new-children
                  ::w (apply + (map ::w new-children))
@@ -135,15 +135,18 @@
 
 (defrecord Vertical []
   Component
-  (paint! [this g]
-    (doseq [c (remove nil? (::children this))] (paint! c g)))
+  (paint! [{::keys [x y children] :as this} g]
+    (save-transform
+     g
+     (.translate g (double x) (double y))
+     (doseq [c (remove nil? children)] (paint! c g))))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
     (let [children (remove nil? children)]
       (if (empty? children)
         (assoc this ::w 0 ::h 0)
-        (let [new-children (linear-arrange children this below-of)]
+        (let [new-children (linear-arrange children below-of)]
           (assoc this
                  ::children new-children
                  ::w (apply max (map ::w new-children))
@@ -159,37 +162,37 @@
 
 (defrecord Grid []
   Component
-  (paint! [{::keys [rows] :as this} g]
-    (doseq [row rows]
-      (doseq [child row]
-        (paint! child g))))
+  (paint! [{::keys [x y rows] :as this} g]
+    (save-transform
+     g
+     (.translate g (double x) (double y))
+     (doseq [row rows]
+       (doseq [child row]
+         (paint! child g)))))
   (ideal-size [this]
     (layout this))
-  (layout [{::keys [x y rows] :as this}]
-    (when-not (and x y)
-      (throw (ex-info "Unable to arrange in a grid - parent has no position info"
-                      {:component this})))
+  (layout [{::keys [rows] :as this}]
     (let [rows          (for [row rows]
                           (for [child row]
-                            (ideal-size child)))
+                            (layout child)))
 
           column-widths (mapv #(apply safe-max (map ::w %)) (transpose rows))
-          x-positions   (vec (reductions + x column-widths))
+          x-positions   (vec (reductions + 0 column-widths))
 
           row-heights   (mapv #(apply safe-max (map ::h %)) rows)
-          y-positions   (vec (reductions + y row-heights))]
+          y-positions   (vec (reductions + 0 row-heights))]
 
       (assoc this
              ::w (apply + column-widths)
              ::h (apply + row-heights)
              ::rows
              (for [[r-idx row] (map-indexed vector rows)]
-               (for [[c-idx child] (map-indexed vector row)]
-                 (let [x (get x-positions c-idx)
-                       y (get y-positions r-idx)
-                       w (get column-widths c-idx)
-                       h (get row-heights r-idx)]
-                   (assoc child ::x x ::y y ::w w ::h h))))))))
+               (when row
+                 (for [[c-idx child] (map-indexed vector row)]
+                   (when child
+                     (let [x (get x-positions c-idx)
+                           y (get y-positions r-idx)]
+                       (assoc child ::x x ::y y))))))))))
 
 (defn grow-bounds [{::keys [x y w h]} d]
   {::x (- x d)
