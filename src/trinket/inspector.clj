@@ -154,7 +154,7 @@
       (ui/map->Grid
        {::cursor  (= cursor path)
         ::tag     (collection-tag data)
-        ::ui/columns 3
+        ::ui/columns 5
         ::ui/children
         (apply concat
          (for [[idx [k v]] (map-indexed vector data)]
@@ -366,7 +366,7 @@
 
 (defrecord Inspector [data-atom options-atom ui-atom frame])
 
-(defn- new-ui [data options]
+(defn- make-new-ui [data options]
   (-> (data->ui data [] options)
       (assoc ::ui/x 10 ::ui/y 10)
       ui/layout
@@ -378,7 +378,7 @@
   ([data options]
    (let [data-atom     (atom data)
          options-atom  (atom (merge default-options options))
-         ui-atom       (atom (new-ui data @options-atom))
+         ui-atom       (atom (make-new-ui data @options-atom))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [^Graphics2D g]
                                  (let [ui @ui-atom
@@ -403,14 +403,14 @@
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
                   (let [{::keys [scale] :as options} @options-atom
-                        {::ui/keys [w h] :as new-ui} (new-ui data options)]
+                        {::ui/keys [w h] :as new-ui} (make-new-ui data options)]
                     (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)
                     (.repaint frame))))
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ _ {::keys [scale] :as options}]
-                  (let [{::ui/keys [w h] :as new-ui} (new-ui @data-atom options)]
+                  (let [{::ui/keys [w h] :as new-ui} (make-new-ui @data-atom options)]
                     (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)
@@ -519,6 +519,5 @@
                     :inner6 20}
             :ccccc "This is a test"})
 
-  (def ins
-    (inspect {:a [0 1 2 3]}))
+  (def ins (inspect {:a [0 1 2 3]}))
 )

@@ -43,16 +43,16 @@
 (defn set-bounds! [^JComponent c {::keys [x y w h]}]
   (.setBounds c x y w h))
 
-(defn paint-at! [^JComponent component ^Graphics2D g {::keys [^int x ^int y w h] :as bounds}]
-  (assert x)
-  (assert y)
+(defn paint-at! [^JComponent component ^Graphics2D g {::keys [^int ax ^int ay w h] :as bounds}]
+  (assert ax)
+  (assert ay)
   (assert w)
   (assert h)
   (save-transform
    g
    ;;(.validate what)
    (set-bounds! component bounds)
-   (.translate g x y)
+   (.translate g ax ay)
    (.paint component g)
    bounds))
 
@@ -114,10 +114,7 @@
 (defrecord Horizontal []
   Component
   (paint! [{::keys [x y children] :as this} g]
-    (save-transform
-     g
-     (.translate g (double x) (double y))
-     (doseq [c (remove nil? children)] (paint! c g))))
+    (doseq [c (remove nil? children)] (paint! c g)))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
@@ -136,10 +133,7 @@
 (defrecord Vertical []
   Component
   (paint! [{::keys [x y children] :as this} g]
-    (save-transform
-     g
-     (.translate g (double x) (double y))
-     (doseq [c (remove nil? children)] (paint! c g))))
+    (doseq [c (remove nil? children)] (paint! c g)))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [x y children] :as this}]
@@ -162,13 +156,8 @@
 
 (defrecord Grid []
   Component
-  (paint! [{::keys [x y rows] :as this} g]
-    (save-transform
-     g
-     (.translate g (double x) (double y))
-     (doseq [row rows]
-       (doseq [child row]
-         (paint! child g)))))
+  (paint! [{::keys [x y children] :as this} g]
+    (doseq [child children] (paint! child g)))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [children columns] :as this}]
@@ -195,11 +184,11 @@
                             y (get y-positions r-idx)]
                         (assoc child ::x x ::y y)))))))))))
 
-(defn grow-bounds [{::keys [x y w h]} d]
-  {::x (- x d)
-   ::y (- y d)
-   ::w (+ w (* 2 d))
-   ::h (+ h (* 2 d))})
+(defn grow-bounds [{::keys [ax ay w h]} d]
+  {::ax (- ax d)
+   ::ay (- ay d)
+   ::w  (+ w (* 2 d))
+   ::h  (+ h (* 2 d))})
 
 (defn zipper [elem]
   (zip/zipper ::children
