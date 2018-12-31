@@ -171,8 +171,8 @@
          (paint! child g)))))
   (ideal-size [this]
     (layout this))
-  (layout [{::keys [rows] :as this}]
-    (let [rows          (for [row rows]
+  (layout [{::keys [children columns] :as this}]
+    (let [rows          (for [row (partition-all columns children)]
                           (for [child row]
                             (layout child)))
 
@@ -185,14 +185,15 @@
       (assoc this
              ::w (apply + column-widths)
              ::h (apply + row-heights)
-             ::rows
-             (for [[r-idx row] (map-indexed vector rows)]
-               (when row
-                 (for [[c-idx child] (map-indexed vector row)]
-                   (when child
-                     (let [x (get x-positions c-idx)
-                           y (get y-positions r-idx)]
-                       (assoc child ::x x ::y y))))))))))
+             ::children
+             (apply concat
+              (for [[r-idx row] (map-indexed vector rows)]
+                (when row
+                  (for [[c-idx child] (map-indexed vector row)]
+                    (when child
+                      (let [x (get x-positions c-idx)
+                            y (get y-positions r-idx)]
+                        (assoc child ::x x ::y y)))))))))))
 
 (defn grow-bounds [{::keys [x y w h]} d]
   {::x (- x d)
@@ -200,14 +201,27 @@
    ::w (+ w (* 2 d))
    ::h (+ h (* 2 d))})
 
-(defn- get-children [x]
-  (or (::children x)
-      (flatten (::rows x))))
-
 (defn zipper [elem]
-  (zip/zipper (some-fn ::children ::rows)
-              get-children
+  (zip/zipper ::children
+              ::children
               #(assoc %1 ::children %2) elem))
+
+(defn add-absolute-coords [ui]
+  (let [z (zipper ui)]
+    (loop [loc z]
+      (if (zip/end? loc)
+        (zip/root loc)
+        (-> (if-let [parent (some-> loc zip/up zip/node)]
+              (zip/edit loc (fn [{::keys [x y] :as node}]
+                              (assoc node
+                                     ::ax (+ x (::ax parent))
+                                     ::ay (+ y (::ay parent)))))
+              (zip/edit loc (fn [{::keys [x y] :as node}]
+                              (assoc node
+                                     ::ax (or x 0)
+                                     ::ay (or y 0)))))
+            zip/next
+            recur)))))
 
 (defn point-within? [{px ::x py ::y} {::keys [x y w h]}]
   (and (<= x px (+ x w))

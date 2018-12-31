@@ -154,39 +154,41 @@
       (ui/map->Grid
        {::cursor  (= cursor path)
         ::tag     (collection-tag data)
-        ::ui/rows
-        (for [[idx [k v]] (map-indexed vector data)]
-          (let [key-path (conj path idx ::path/key)
-                val-path (conj path idx ::path/val)]
-            [ ;;opening
-             (if (zero? idx)
-               (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
-               (ui/text " "))
+        ::ui/columns 3
+        ::ui/children
+        (apply concat
+         (for [[idx [k v]] (map-indexed vector data)]
+           (let [key-path (conj path idx ::path/key)
+                 val-path (conj path idx ::path/val)]
+             [ ;;opening
+              (if (zero? idx)
+                (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
+                (ui/text " "))
 
-             ;;key
-             (if (get expanded key-path)
-               (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
-               (data->ui k key-path (assoc options ::text (k->str k) ::idx idx ::last-idx last-idx ::cursor cursor)))
+              ;;key
+              (if (get expanded key-path)
+                (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
+                (data->ui k key-path (assoc options ::text (k->str k) ::idx idx ::last-idx last-idx ::cursor cursor)))
 
-             (ui/text " ")
+              (ui/text " ")
 
-             ;;value
-             (if (get expanded val-path)
-               (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
-               (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor)))
+              ;;value
+              (if (get expanded val-path)
+                (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
+                (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor)))
 
-             ;; closing
-             (if (= idx last-idx)
-               (-> (ui/text "}") (assoc ::path path))
-               (ui/text " "))]))}))))
+              ;; closing
+              (if (= idx last-idx)
+                (-> (ui/text "}") (assoc ::path path))
+                (ui/text " "))])))}))))
 
 (defn paint-cursor [ui ^Graphics2D g]
   (when-let [match (ui/find-component ui ::cursor)]
     (let [cursor (ui/grow-bounds match 1)]
       (doto g
         (.setColor ui/color-selection-background)
-        (.fillRect (int (::ui/x cursor))
-                   (int (::ui/y cursor))
+        (.fillRect (int (::ui/ax cursor))
+                   (int (::ui/ay cursor))
                    (int (::ui/w cursor))
                    (int (::ui/h cursor)))))))
 
@@ -364,13 +366,19 @@
 
 (defrecord Inspector [data-atom options-atom ui-atom frame])
 
+(defn- new-ui [data options]
+  (-> (data->ui data [] options)
+      (assoc ::ui/x 10 ::ui/y 10)
+      ui/layout
+      ui/add-absolute-coords))
+
 (defn inspect
   ([data]
    (inspect data {}))
   ([data options]
    (let [data-atom     (atom data)
          options-atom  (atom (merge default-options options))
-         ui-atom       (atom (-> (data->ui data [] @options-atom) (assoc ::ui/x 10 ::ui/y 10) ui/layout))
+         ui-atom       (atom (new-ui data @options-atom))
          ^JPanel panel (doto (proxy [JPanel] []
                                (paintComponent [^Graphics2D g]
                                  (let [ui @ui-atom
@@ -395,14 +403,14 @@
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
                   (let [{::keys [scale] :as options} @options-atom
-                        {::ui/keys [w h] :as new-ui} (-> (data->ui data [] options) (assoc ::ui/x 10 ::ui/y 10) ui/layout)]
+                        {::ui/keys [w h] :as new-ui} (new-ui data options)]
                     (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)
                     (.repaint frame))))
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ _ {::keys [scale] :as options}]
-                  (let [{::ui/keys [w h] :as new-ui} (-> (data->ui @data-atom [] options) (assoc ::ui/x 10 ::ui/y 10) ui/layout)]
+                  (let [{::ui/keys [w h] :as new-ui} (new-ui @data-atom options)]
                     (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
                     (reset! ui-atom new-ui)
                     (.revalidate panel)

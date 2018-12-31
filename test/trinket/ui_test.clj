@@ -24,212 +24,276 @@
 (deftest layout-test
   (testing "horizontal layout"
     (is
-     (= #trinket.ui.Horizontal{:trinket.ui/x        10
-                               :trinket.ui/y        10
-                               :trinket.ui/w        60
-                               :trinket.ui/h        10
-                               :trinket.ui/children
-                               [#trinket.ui_test.EasyText{:trinket.ui/text "aa"
-                                                          :trinket.ui/x    10
-                                                          :trinket.ui/y    10
-                                                          :trinket.ui/w    20
-                                                          :trinket.ui/h    10}
-                                #trinket.ui_test.EasyText{:trinket.ui/text "bb"
-                                                          :trinket.ui/x    30
-                                                          :trinket.ui/y    10
-                                                          :trinket.ui/w    20
-                                                          :trinket.ui/h    10}
-                                #trinket.ui_test.EasyText{:trinket.ui/text "cc"
-                                                          :trinket.ui/x    50
-                                                          :trinket.ui/y    10
-                                                          :trinket.ui/w    20
-                                                          :trinket.ui/h    10}]}
-        (ui/layout
-         (ui/map->Horizontal
-          {::ui/x 10
-           ::ui/y 10
-           ::ui/children
-           [(tt "aa")
-            (tt "bb")
-            (tt "cc")]})))))
+     (= #trinket.ui.Horizontal
+        {::ui/x        10
+         ::ui/y        10
+         ::ui/w        60
+         ::ui/h        10
+         ::ui/ax       10
+         ::ui/ay       10
+         ::ui/children
+         [#trinket.ui_test.EasyText{::ui/text "aa"
+                                    ::ui/x    0
+                                    ::ui/y    0
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   10
+                                    ::ui/ay   10}
+          #trinket.ui_test.EasyText{::ui/text "bb"
+                                    ::ui/x    20
+                                    ::ui/y    0
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   30
+                                    ::ui/ay   10}
+          #trinket.ui_test.EasyText{::ui/text "cc"
+                                    ::ui/x    40
+                                    ::ui/y    0
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   50
+                                    ::ui/ay   10}]}
+        (ui/add-absolute-coords
+         (ui/layout
+          (ui/map->Horizontal
+           {::ui/x 10
+            ::ui/y 10
+            ::ui/children
+            [(tt "aa")
+             (tt "bb")
+             (tt "cc")]}))))))
 
   (testing "vertical layout"
     (is
-     (= #trinket.ui.Vertical{:trinket.ui/x        10
-                             :trinket.ui/y        10
-                             :trinket.ui/w        40
-                             :trinket.ui/h        30
-                             :trinket.ui/children
-                             [#trinket.ui_test.EasyText{:trinket.ui/text "aaa"
-                                                        :trinket.ui/x    10
-                                                        :trinket.ui/y    10
-                                                        :trinket.ui/w    30
-                                                        :trinket.ui/h    10}
-                              #trinket.ui_test.EasyText{:trinket.ui/text "bb"
-                                                        :trinket.ui/x    10
-                                                        :trinket.ui/y    20
-                                                        :trinket.ui/w    20
-                                                        :trinket.ui/h    10}
-                              #trinket.ui_test.EasyText{:trinket.ui/text "cccc"
-                                                        :trinket.ui/x    10
-                                                        :trinket.ui/y    30
-                                                        :trinket.ui/w    40
-                                                        :trinket.ui/h    10}]}
-        (ui/layout
-         (ui/map->Vertical
-          {::ui/x 10
-           ::ui/y 10
-           ::ui/children
-           [(tt "aaa")
-            (tt "bb")
-            (tt "cccc")]})))))
+     (= #trinket.ui.Vertical
+        {::ui/x        10
+         ::ui/y        10
+         ::ui/w        40
+         ::ui/h        30
+         ::ui/ax       10
+         ::ui/ay       10
+         ::ui/children
+         [#trinket.ui_test.EasyText{::ui/text "aaa"
+                                    ::ui/x    0
+                                    ::ui/y    0
+                                    ::ui/w    30
+                                    ::ui/h    10
+                                    ::ui/ax   10
+                                    ::ui/ay   10}
+          #trinket.ui_test.EasyText{::ui/text "bb"
+                                    ::ui/x    0
+                                    ::ui/y    10
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   10
+                                    ::ui/ay   20}
+          #trinket.ui_test.EasyText{::ui/text "cccc"
+                                    ::ui/x    0
+                                    ::ui/y    20
+                                    ::ui/w    40
+                                    ::ui/h    10
+                                    ::ui/ax   10
+                                    ::ui/ay   30}]}
+        (ui/add-absolute-coords
+         (ui/layout
+          (ui/map->Vertical
+           {::ui/x 10
+            ::ui/y 10
+            ::ui/children
+            [(tt "aaa")
+             (tt "bb")
+             (tt "cccc")]}))))))
 
   (testing "vertical within horizontal"
     (is
      (= #trinket.ui.Horizontal
-        {:trinket.ui/x        10
-         :trinket.ui/y        10
-         :trinket.ui/w        50
-         :trinket.ui/h        20
-         :trinket.ui/children
+        {::ui/x        10
+         ::ui/y        10
+         ::ui/ax       10
+         ::ui/ay       10
+         ::ui/w        50
+         ::ui/h        20
+         ::ui/children
          [#trinket.ui.Vertical
-          {:trinket.ui/x        10
-           :trinket.ui/y        10
-           :trinket.ui/w        30
-           :trinket.ui/h        20
-           :trinket.ui/children
-           [#trinket.ui_test.EasyText{:trinket.ui/text "aaa"
-                                      :trinket.ui/x    10
-                                      :trinket.ui/y    10
-                                      :trinket.ui/w    30
-                                      :trinket.ui/h    10}
-            #trinket.ui_test.EasyText{:trinket.ui/text "bb"
-                                      :trinket.ui/x    10
-                                      :trinket.ui/y    20
-                                      :trinket.ui/w    20
-                                      :trinket.ui/h    10}]}
-          #trinket.ui.Vertical
-          {:trinket.ui/x        40
-           :trinket.ui/y        10
-           :trinket.ui/w        20
-           :trinket.ui/h        20
-           :trinket.ui/children
-           [#trinket.ui_test.EasyText{:trinket.ui/text "a"
-                                      :trinket.ui/x 40
-                                      :trinket.ui/y 10
-                                      :trinket.ui/w 10
-                                      :trinket.ui/h 10}
-            #trinket.ui_test.EasyText{:trinket.ui/text "bb"
-                                      :trinket.ui/x    40
-                                      :trinket.ui/y    20
-                                      :trinket.ui/w    20
-                                      :trinket.ui/h    10}]}]}
-        (ui/layout
-         (ui/map->Horizontal
-          {::ui/x 10
-           ::ui/y 10
+          {::ui/x        0
+           ::ui/y        0
+           ::ui/ax       10
+           ::ui/ay       10
+           ::ui/w        30
+           ::ui/h        20
            ::ui/children
-           [(ui/map->Vertical
-             {::ui/children
-              [(tt "aaa")
-               (tt "bb")]})
-            (ui/map->Vertical
-             {::ui/children
-              [(tt "a")
-               (tt "bb")]})]})))))
+           [#trinket.ui_test.EasyText{::ui/text "aaa"
+                                      ::ui/x    0
+                                      ::ui/y    0
+                                      ::ui/ax   10
+                                      ::ui/ay   10
+                                      ::ui/w    30
+                                      ::ui/h    10}
+            #trinket.ui_test.EasyText{::ui/text "bb"
+                                      ::ui/x    0
+                                      ::ui/y    10
+                                      ::ui/ax   10
+                                      ::ui/ay   20
+                                      ::ui/w    20
+                                      ::ui/h    10}]}
+          #trinket.ui.Vertical
+          {::ui/x        30
+           ::ui/y        0
+           ::ui/ax       40
+           ::ui/ay       10
+           ::ui/w        20
+           ::ui/h        20
+           ::ui/children
+           [#trinket.ui_test.EasyText{::ui/text "a"
+                                      ::ui/x    0
+                                      ::ui/y    0
+                                      ::ui/ax   40
+                                      ::ui/ay   10
+                                      ::ui/w    10
+                                      ::ui/h    10}
+            #trinket.ui_test.EasyText{::ui/text "bb"
+                                      ::ui/x    0
+                                      ::ui/y    10
+                                      ::ui/ax   40
+                                      ::ui/ay   20
+                                      ::ui/w    20
+                                      ::ui/h    10}]}]}
+        (ui/add-absolute-coords
+         (ui/layout
+          (ui/map->Horizontal
+           {::ui/x 10
+            ::ui/y 10
+            ::ui/children
+            [(ui/map->Vertical
+              {::ui/children
+               [(tt "aaa")
+                (tt "bb")]})
+             (ui/map->Vertical
+              {::ui/children
+               [(tt "a")
+                (tt "bb")]})]}))))))
 
   (testing "triple nesting"
     (is
      (= #trinket.ui.Vertical
-        {:trinket.ui/x        10
-         :trinket.ui/y        10
-         :trinket.ui/w        20
-         :trinket.ui/h        30
-         :trinket.ui/children
-         [#trinket.ui_test.EasyText{:trinket.ui/text "x1"
-                                    :trinket.ui/x    10
-                                    :trinket.ui/y    10
-                                    :trinket.ui/w    20
-                                    :trinket.ui/h    10}
+        {::ui/x        10
+         ::ui/y        10
+         ::ui/ax       10
+         ::ui/ay       10
+         ::ui/w        20
+         ::ui/h        30
+         ::ui/children
+         [#trinket.ui_test.EasyText{::ui/text "x1"
+                                    ::ui/x    0
+                                    ::ui/y    0
+                                    ::ui/ax   10
+                                    ::ui/ay   10
+                                    ::ui/w    20
+                                    ::ui/h    10}
           #trinket.ui.Vertical
-          {:trinket.ui/x        10
-           :trinket.ui/y        20
-           :trinket.ui/w        20
-           :trinket.ui/h        20
-           :trinket.ui/children
-           [#trinket.ui_test.EasyText{:trinket.ui/text "x2"
-                                      :trinket.ui/x    10
-                                      :trinket.ui/y    20
-                                      :trinket.ui/w    20
-                                      :trinket.ui/h    10}
-            #trinket.ui.Vertical
-            {:trinket.ui/x        10
-             :trinket.ui/y        30
-             :trinket.ui/w        20
-             :trinket.ui/h        10
-             :trinket.ui/children
-             [#trinket.ui_test.EasyText{:trinket.ui/text "x3"
-                                        :trinket.ui/x    10
-                                        :trinket.ui/y    30
-                                        :trinket.ui/w    20
-                                        :trinket.ui/h    10}]}]}]}
-
-        (ui/layout
-         (ui/map->Vertical
-          {::ui/x 10
-           ::ui/y 10
+          {::ui/x        0
+           ::ui/y        10
+           ::ui/ax       10
+           ::ui/ay       20
+           ::ui/w        20
+           ::ui/h        20
            ::ui/children
-           [(tt "x1")
-            (ui/map->Vertical
-             {::ui/children
-              [(tt "x2")
-               (ui/map->Vertical
-                {::ui/children
-                 [(tt "x3")]})]})]})))))
+           [#trinket.ui_test.EasyText{::ui/text "x2"
+                                      ::ui/x    0
+                                      ::ui/y    0
+                                      ::ui/ax   10
+                                      ::ui/ay   20
+                                      ::ui/w    20
+                                      ::ui/h    10}
+            #trinket.ui.Vertical
+            {::ui/x        0
+             ::ui/y        10
+             ::ui/ax       10
+             ::ui/ay       30
+             ::ui/w        20
+             ::ui/h        10
+             ::ui/children
+             [#trinket.ui_test.EasyText{::ui/text "x3"
+                                        ::ui/x    0
+                                        ::ui/y    0
+                                        ::ui/ax   10
+                                        ::ui/ay   30
+                                        ::ui/w    20
+                                        ::ui/h    10}]}]}]}
+        (ui/add-absolute-coords
+         (ui/layout
+          (ui/map->Vertical
+           {::ui/x 10
+            ::ui/y 10
+            ::ui/children
+            [(tt "x1")
+             (ui/map->Vertical
+              {::ui/children
+               [(tt "x2")
+                (ui/map->Vertical
+                 {::ui/children
+                  [(tt "x3")]})]})]}))))))
 
   (testing "grid"
     (is
      (= #trinket.ui.Grid
-        {:trinket.ui/x    10
-         :trinket.ui/y    10
-         :trinket.ui/w    40
-         :trinket.ui/h    30
-         :trinket.ui/rows
-         [[#trinket.ui_test.EasyText{:trinket.ui/text "aa"
-                                     :trinket.ui/w    20
-                                     :trinket.ui/h    10
-                                     :trinket.ui/x    10
-                                     :trinket.ui/y    10}
-           #trinket.ui_test.EasyText{:trinket.ui/text "bb"
-                                     :trinket.ui/w    20
-                                     :trinket.ui/h    10
-                                     :trinket.ui/x    30
-                                     :trinket.ui/y    10}]
-          [#trinket.ui_test.EasyText{:trinket.ui/text "cc"
-                                     :trinket.ui/w    20
-                                     :trinket.ui/h    10
-                                     :trinket.ui/x    10
-                                     :trinket.ui/y    20}
-           #trinket.ui_test.EasyText{:trinket.ui/text "dd"
-                                     :trinket.ui/w    20
-                                     :trinket.ui/h    10
-                                     :trinket.ui/x    30
-                                     :trinket.ui/y    20}]
-          [#trinket.ui_test.EasyText{:trinket.ui/text "ee"
-                                     :trinket.ui/w    20
-                                     :trinket.ui/h    10
-                                     :trinket.ui/x    10
-                                     :trinket.ui/y    30}
-           #trinket.ui_test.EasyText{:trinket.ui/text "ff"
-                                     :trinket.ui/w    20
-                                     :trinket.ui/h    10
-                                     :trinket.ui/x    30
-                                     :trinket.ui/y    30}]]}
-        (ui/layout
-         (ui/map->Grid
-          {::ui/x 10
-           ::ui/y 10
-           ::ui/rows
-           [[(tt "aa") (tt "bb")]
-            [(tt "cc") (tt "dd")]
-            [(tt "ee") (tt "ff")]]}))))))
+        {::ui/x        10
+         ::ui/y        10
+         ::ui/ax       10
+         ::ui/ay       10
+         ::ui/w        40
+         ::ui/h        30
+         ::ui/columns  2
+         ::ui/children
+         [#trinket.ui_test.EasyText{::ui/text "aa"
+                                    ::ui/x    0
+                                    ::ui/y    0
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   10
+                                    ::ui/ay   10}
+          #trinket.ui_test.EasyText{::ui/text "bb"
+                                    ::ui/x    20
+                                    ::ui/y    0
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   30
+                                    ::ui/ay   10}
+          #trinket.ui_test.EasyText{::ui/text "cc"
+                                    ::ui/x    0
+                                    ::ui/y    10
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   10
+                                    ::ui/ay   20}
+          #trinket.ui_test.EasyText{::ui/text "dd"
+                                    ::ui/x    20
+                                    ::ui/y    10
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   30
+                                    ::ui/ay   20}
+          #trinket.ui_test.EasyText{::ui/text "ee"
+                                    ::ui/x    0
+                                    ::ui/y    20
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   10
+                                    ::ui/ay   30}
+          #trinket.ui_test.EasyText{::ui/text "ff"
+                                    ::ui/x    20
+                                    ::ui/y    20
+                                    ::ui/w    20
+                                    ::ui/h    10
+                                    ::ui/ax   30
+                                    ::ui/ay   30}]}
+        (ui/add-absolute-coords
+         (ui/layout
+          (ui/map->Grid
+           {::ui/x        10
+            ::ui/y        10
+            ::ui/columns  2
+            ::ui/children
+            [(tt "aa") (tt "bb")
+             (tt "cc") (tt "dd")
+             (tt "ee") (tt "ff")]})))))))
