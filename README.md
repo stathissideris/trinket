@@ -17,7 +17,7 @@ Clojure data inspector
 
 - [ ] Make closing brace align with the bottom of the last item (see
       what happens if you expand the last item)
-- [ ] Take into account expansion state when doing layout (see what
+- [x] Take into account expansion state when doing layout (see what
       happens when you expand a key that is a map)
 - [x] Place cursor at root of data when starting
 - [ ] Realize lazy seqs in the background

@@ -146,11 +146,7 @@
   [data path {::keys [cursor expanded idx last-idx] :as options}]
   (if-not (get expanded path)
     (atom->ui data path options)
-    (let [k->str   (zipmap (keys data)
-                           (map pr-str (keys data)))
-          longest  (apply max (map count (vals k->str)))
-          k->str   (update-vals k->str #(right-pad % longest))
-          last-idx (dec (count data))]
+    (let [last-idx (dec (count data))]
       (ui/map->Grid
        {::cursor  (= cursor path)
         ::tag     (collection-tag data)
@@ -168,7 +164,7 @@
               ;;key
               (if (get expanded key-path)
                 (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
-                (data->ui k key-path (assoc options ::text (k->str k) ::idx idx ::last-idx last-idx ::cursor cursor)))
+                (data->ui k key-path (assoc options ::text (pr-str k) ::idx idx ::last-idx last-idx ::cursor cursor)))
 
               (ui/text " ")
 
@@ -520,4 +516,5 @@
             :ccccc "This is a test"})
 
   (def ins (inspect {:a [0 1 2 3]}))
+  (def ins (inspect the-data))
 )
