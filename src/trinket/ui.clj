@@ -254,10 +254,10 @@
     (loop [loc z]
       (if (zip/end? loc)
         (zip/root loc)
-        (let [{::keys [x y w h size] :as node :or {size default-font-size}} (zip/node loc)]
+        (let [{::keys [ax ay w h size] :as node :or {size default-font-size}} (zip/node loc)]
           (->> (cond-> node
-                 x (assoc ::x (* factor x))
-                 y (assoc ::y (* factor y))
+                 ax (assoc ::ax (* factor ax))
+                 ay (assoc ::ay (* factor ay))
                  w (assoc ::w (* factor w))
                  h (assoc ::h (* factor h))
                  size (assoc ::size (* factor size)))
