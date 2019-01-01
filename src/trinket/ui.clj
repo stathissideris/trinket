@@ -168,12 +168,17 @@
     (doseq [child children] (paint! child g)))
   (ideal-size [this]
     (layout this))
-  (layout [{::keys [children columns] :as this}]
+  (layout [{::keys [children columns column-padding]
+            :or    {column-padding 0}
+            :as    this}]
     (let [rows          (for [row (partition-all columns children)]
                           (for [child row]
                             (when child (layout child))))
 
-          column-widths (mapv #(safe-max (map (fnil ::w {::w 0}) %)) (transpose rows))
+          column-widths (mapv #(safe-max (->> %
+                                              (map (fnil ::w {::w 0}))
+                                              (map (partial + column-padding))))
+                              (transpose rows))
           x-positions   (vec (reductions + 0 column-widths))
 
           row-heights   (mapv #(safe-max (map (fnil ::h {::h 0}) %)) rows)

@@ -26,7 +26,7 @@ Clojure data inspector
 - [x] BUG: clicking breaks view has been scaled
 - [x] BUG: click to select tables
 - [x] Table view
-- [ ] Table view styling
+- [x] Table view styling
 - [ ] Table view navigation
 - [ ] Customisable keys
 - [ ] Move drop/take code for paging lazy sequences out of drawing

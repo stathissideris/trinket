@@ -11,7 +11,7 @@
 
 (set! *warn-on-reflection* true)
 
-(def last-inspector (atom nil))
+(defonce last-inspector (atom nil))
 
 (def default-options {::cursor       []
                       ::expanded     #{[]}
@@ -75,7 +75,8 @@
           [(-> (annotation "TABLE")
                (assoc ::path path))
            (ui/map->Grid
-            {::ui/columns (inc (count total-keys))
+            {::ui/column-padding 5
+             ::ui/columns        (inc (count total-keys))
              ::ui/children
              (concat [nil] (map #(atom->ui % nil (assoc options ::underline true)) total-keys)
                      (mapcat (fn [idx row]
@@ -322,7 +323,6 @@
 (defn- is-shortcut-down? [^KeyEvent e]
   (.isMetaDown e))
 
-
 (defn- safe-dec [x]
   (max 0 ((fnil dec 0) x)))
 
@@ -419,7 +419,7 @@
                                                 (+ 2 (.getHeight ^JPanel this))))
                                    (#'paint-cursor ui g)
                                    (ui/paint! ui g)))))
-         frame         (doto (JFrame. "Trinket tree inspector")
+         frame         (doto (JFrame. "trinket")
                          (.add (doto (JScrollPane. panel)
                                  ((fn [sp]
                                     (.setUnitIncrement (.getVerticalScrollBar ^JScrollPane sp) 16)
@@ -493,7 +493,7 @@
        {:name "Nick" :surname "Nolte" :activity "music"}
        {:name "Cecil" :surname "Adams" :activity "music"}
        {:name "Salvador" :surname "Dali" :activity "music"}
-       {:name "Speedy0" :surname "Gonzales0" :activity "music"}
+       {:name "Speedy0" :surname "Gonzales0" :activity ["music" "running"]}
        {:name "Speedy1" :surname "Gonzales1" :activity "music"}
        {:name "Speedy2" :surname "Gonzales2" :activity "music"}
        {:name "Speedy3" :surname "Gonzales3" :activity "music"}
@@ -583,7 +583,7 @@
                     {::scale    2
                      ::cursor   [1]
                      ::expanded #{[] [1]}}))
-  (set-data! the-data)
+  (set-data! ins the-data)
 
   (-> (ui/find-component @(:ui-atom @last-inspector) ::cursor)
       (dissoc ::ui/children)
