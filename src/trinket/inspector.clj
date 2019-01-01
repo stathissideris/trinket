@@ -11,6 +11,8 @@
 
 (set! *warn-on-reflection* true)
 
+(def last-inspector (atom nil))
+
 (def default-options {::cursor       []
                       ::expanded     #{[]}
                       ::scale        1
@@ -54,40 +56,44 @@
 (defn- indicate-lazy [ui]
   (ui/map->Horizontal {::ui/children [(annotation "L") ui]}))
 
-(defn atom->ui [data path {::keys [text idx last-idx cursor page-length]}]
+(defn- config-component [ui data path {::keys [idx last-idx cursor]}]
+  (cond-> ui
+    :always (assoc ::path path
+                   ::index idx
+                   ::tag (collection-tag data))
+    (and idx (zero? idx)) (assoc ::first true)
+    (and idx (= idx last-idx)) (assoc ::last true)
+    (and cursor (= cursor path)) (assoc ::cursor true)))
+
+(defn atom->ui [data path {::keys [text page-length] :as options}]
   (let [color (cond (keyword? data) ui/color-keywords
                     (string? data)  ui/color-strings
                     :else           ui/color-text)]
-    (cond-> (ui/text {::ui/text  (if text text
-                                     (binding [*print-length* page-length]
-                                       (pr-str data)))
-                      ::ui/color color})
-      :always (assoc ::path path
-                     ::index idx
-                     ::tag (collection-tag data))
-      (and idx (zero? idx)) (assoc ::first true)
-      (and idx (= idx last-idx)) (assoc ::last true)
-      (and cursor (= cursor path)) (assoc ::cursor true))))
+    (-> (ui/text {::ui/text  (if text text
+                                 (binding [*print-length* page-length]
+                                   (pr-str data)))
+                  ::ui/color color})
+        (config-component data path options))))
 
 (defn- tabular-data? [data]
   (every? map? data))
 
-(defn- data-table [data path {::keys [offset cursor]
+(defn- data-table [data path {::keys [offset]
                               :as    options
                               :or    {offset 0}}]
   (let [total-keys (sort (distinct (mapcat keys data)))]
-    (ui/map->Vertical
-     {::cursor      (= cursor path)
-      ::path        path
-      ::ui/children
-      [(annotation "TABLE")
-       (ui/map->Grid
-        {::ui/columns (inc (count total-keys))
-         ::ui/children
-         (concat [nil] (map #(atom->ui % nil options) total-keys)
-                 (mapcat (fn [idx row]
-                           (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys)))
-                         (range) data))})]})))
+    (-> (ui/map->Vertical
+         {::ui/children
+          [(-> (annotation "TABLE")
+               (assoc ::path path))
+           (ui/map->Grid
+            {::ui/columns (inc (count total-keys))
+             ::ui/children
+             (concat [nil] (map #(atom->ui % nil options) total-keys)
+                     (mapcat (fn [idx row]
+                               (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys)))
+                             (range) data))})]})
+        (config-component data path options))))
 
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx offset
                                          suppress-indexes tables]
@@ -109,7 +115,7 @@
               (let [value-path (conj path idx)]
                 (ui/map->Horizontal
                  {::ui/children
-                  [ ;;opening
+                  [;;opening
                    (if (zero? idx)
                      (-> (ui/text opening) (assoc ::path path)) ;; assoc path to allow mouse selection of whole map
                      (ui/text (or indent-str " ")))
@@ -216,13 +222,21 @@
       (.setContents (StringSelection. s) nil))
   s)
 
-(defn- set-data! [{:keys [data-atom] :as inspector} data]
-  (reset! data-atom data)
-  nil) ;;prevent print explosion
+(defn- set-data!
+  ([data]
+   (set-data! nil data))
+  ([inspector data]
+   (let [{:keys [data-atom]} (or inspector @last-inspector)]
+     (reset! data-atom data))
+   nil)) ;;prevent print explosion
 
-(defn- set-options! [{:keys [options-atom] :as inspector} options]
-  (reset! options-atom options)
-  nil) ;;prevent print explosion
+(defn- set-options!
+  ([options]
+   (set-options! nil options))
+  ([inspector options]
+   (let [{:keys [options-atom]} (or inspector @last-inspector)]
+     (reset! options-atom options))
+   nil)) ;;prevent print explosion
 
 (defn- swap-options! [{:keys [options-atom] :as inspector} & args]
   (apply swap! options-atom args)
@@ -450,6 +464,8 @@
        (.addKeyListener (key-listener inspector))
        (.setVisible true))
 
+     (reset! last-inspector inspector)
+
      inspector)))
 
 
@@ -541,12 +557,12 @@
      :ccccc         "This is a test"})
 
 
-  (set-data! ins {:a     10000
-                  :bbbb  {:gg 88
-                          :ffff 10}
-                  :ccccc "This is a very important test"})
+  (set-data! {:a     10000
+              :bbbb  {:gg 88
+                      :ffff 10}
+              :ccccc "This is a very important test"})
 
-  (set-data! ins (vec (map #(apply str (repeat % "O")) (range 200))))
+  (set-data! (vec (map #(apply str (repeat % "O")) (range 200))))
 
   (set-options! ins {::expanded #{[] [2 ::path/val]}
                      ::cursor [2 ::path/val]})
@@ -579,6 +595,9 @@
                     {::scale    2
                      ::cursor   [1]
                      ::expanded #{[] [1]}}))
-  (set-data! ins the-data)
+  (set-data! the-data)
 
+  (-> (ui/find-component @(:ui-atom @last-inspector) ::cursor)
+      (dissoc ::ui/children)
+      (clojure.pprint/pprint))
   )

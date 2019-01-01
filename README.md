@@ -24,8 +24,10 @@ Clojure data inspector
 - [ ] Scroll to follow cursor
 - [ ] Don't draw outside visible area
 - [x] BUG: clicking breaks view has been scaled
-- [ ] BUG: click to select tables
-- [ ] Table view
+- [x] BUG: click to select tables
+- [x] Table view
+- [ ] Table view styling
+- [ ] Table view navigation
 - [ ] Customisable keys
 - [ ] Move drop/take code for paging lazy sequences out of drawing
       code and into the event loop. This will allow us to constrain
