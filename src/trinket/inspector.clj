@@ -52,14 +52,15 @@
     (and idx (= idx last-idx)) (assoc ::last true)
     (and cursor (= cursor path)) (assoc ::cursor true)))
 
-(defn atom->ui [data path {::keys [text page-length] :as options}]
+(defn atom->ui [data path {::keys [text page-length underline] :as options}]
   (let [color (cond (keyword? data) ui/color-keywords
                     (string? data)  ui/color-strings
                     :else           ui/color-text)]
-    (-> (ui/text {::ui/text  (if text text
-                                 (binding [*print-length* page-length]
-                                   (pr-str data)))
-                  ::ui/color color})
+    (-> (ui/text {::ui/text      (if text text
+                                     (binding [*print-length* page-length]
+                                       (pr-str data)))
+                  ::ui/color     color
+                  ::ui/underline underline})
         (config-component data path options))))
 
 (defn- tabular-data? [data]
@@ -76,7 +77,7 @@
            (ui/map->Grid
             {::ui/columns (inc (count total-keys))
              ::ui/children
-             (concat [nil] (map #(atom->ui % nil options) total-keys)
+             (concat [nil] (map #(atom->ui % nil (assoc options ::underline true)) total-keys)
                      (mapcat (fn [idx row]
                                (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys)))
                              (range) data))})]})

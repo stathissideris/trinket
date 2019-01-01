@@ -77,8 +77,10 @@
 
 (defrecord Text []
   Component
-  (paint! [{::keys [text selected font size color] :as this} g]
-    (.setText text-stamp text)
+  (paint! [{::keys [text selected font size color underline] :as this} g]
+    (if underline
+      (.setText text-stamp (str "<html><u>" text "</u></html>"))
+      (.setText text-stamp text))
     (if selected
       (doto text-stamp
         (.setOpaque true)
