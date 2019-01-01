@@ -15,7 +15,7 @@ Clojure data inspector
 
 ## TODO
 
-- [ ] Make closing brace align with the bottom of the last item (see
+- [x] Make closing brace align with the bottom of the last item (see
       what happens if you expand the last item)
 - [x] Take into account expansion state when doing layout (see what
       happens when you expand a key that is a map)

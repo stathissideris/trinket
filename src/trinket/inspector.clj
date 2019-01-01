@@ -41,7 +41,7 @@
             ::ui/color ui/color-index}))
 
 (defn- indicate-lazy [ui]
-  (ui/map->Horizontal {::ui/children [(annotation "L") ui]}))
+  (ui/horizontal {::ui/children [(annotation "L") ui]}))
 
 (defn- config-component [ui data path {::keys [idx last-idx cursor]}]
   (cond-> ui
@@ -70,7 +70,7 @@
                               :as    options
                               :or    {offset 0}}]
   (let [total-keys (sort (distinct (mapcat keys data)))]
-    (-> (ui/map->Vertical
+    (-> (ui/vertical
          {::ui/children
           [(-> (annotation "TABLE")
                (assoc ::path path))
@@ -96,13 +96,13 @@
 
         :else
         (let [last-idx (dec (count data))]
-          (ui/map->Vertical
+          (ui/vertical
            {::cursor      (= cursor path)
             ::tag         (collection-tag data)
             ::ui/children
             (for [[idx v] (map-indexed vector data)]
               (let [value-path (conj path idx)]
-                (ui/map->Horizontal
+                (ui/horizontal
                  {::ui/children
                   [;;opening
                    (if (zero? idx)
@@ -115,7 +115,7 @@
                                       (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
                                       (data->ui v value-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor))))]
                      (if (and show-indexes (not suppress-indexes))
-                       (ui/map->Horizontal
+                       (ui/horizontal
                         {::ui/children
                          [(annotation (str (+ idx offset)))
                           value-ui]})
