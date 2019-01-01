@@ -46,7 +46,7 @@
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
 (defn annotation [x]
-  (ui/text {::ui/text  x
+  (ui/text {::ui/text  (str x)
             ::ui/size  8
             ::ui/font  ui/font-regular
             ::ui/color ui/color-index}))
@@ -74,16 +74,22 @@
 (defn- tabular-data? [data]
   (every? map? data))
 
-(defn- data-table [data options]
+(defn- data-table [data path {::keys [offset cursor]
+                              :as    options
+                              :or    {offset 0}}]
   (let [total-keys (sort (distinct (mapcat keys data)))]
     (ui/map->Vertical
-     {::ui/children
+     {::cursor      (= cursor path)
+      ::path        path
+      ::ui/children
       [(annotation "TABLE")
        (ui/map->Grid
-        {::ui/columns (count total-keys)
+        {::ui/columns (inc (count total-keys))
          ::ui/children
-         (concat (map ui/text total-keys)
-                 (mapcat (fn [row] (map #(ui/text (get row %)) total-keys)) data))})]})))
+         (concat [nil] (map #(atom->ui % nil options) total-keys)
+                 (mapcat (fn [idx row]
+                           (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys)))
+                         (range) data))})]})))
 
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx offset
                                          suppress-indexes tables]
@@ -93,7 +99,7 @@
         (atom->ui data path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))
 
         (and (get tables path) (tabular-data? data))
-        (data-table data options)
+        (data-table data path options)
 
         :else
         (let [last-idx (dec (count data))]
@@ -478,32 +484,33 @@
 
   (def the-data
     ["foo"
-     [{:name "Stathis" :surname "Sideris" :activity "coding"}
-      {:name "Tom" :surname "Waits" :activity "music"}
-      {:name "Adam" :surname "Harris" :activity "music"}
-      {:name "Nick" :surname "Nolte" :activity "music"}
-      {:name "Cecil" :surname "Adams" :activity "music"}
-      {:name "Salvador" :surname "Dali" :activity "music"}
-      {:name "Speedy0" :surname "Gonzales0" :activity "music"}
-      {:name "Speedy1" :surname "Gonzales1" :activity "music"}
-      {:name "Speedy2" :surname "Gonzales2" :activity "music"}
-      {:name "Speedy3" :surname "Gonzales3" :activity "music"}
-      {:name "Speedy4" :surname "Gonzales4" :activity "music"}
-      {:name "Speedy5" :surname "Gonzales5" :activity "music"}
-      {:name "Speedy6" :surname "Gonzales6" :activity "music"}
-      {:name "Speedy7" :surname "Gonzales7" :activity "music"}
-      {:name "Speedy8" :surname "Gonzales8" :activity "music"}
-      {:name "Speedy9" :surname "Gonzales9" :activity "music"}
-      {:name "Speedy10" :surname "Gonzales10" :activity "music"}
-      {:name "Speedy11" :surname "Gonzales11" :activity "music"}
-      {:name "Speedy12" :surname "Gonzales12" :activity "music"}
-      {:name "Speedy13" :surname "Gonzales13" :activity "music"}
-      {:name "Speedy14" :surname "Gonzales14" :activity "music"}
-      {:name "Speedy15" :surname "Gonzales15" :activity "music"}
-      {:name "Speedy16" :surname "Gonzales16" :activity "music"}
-      {:name "Speedy17" :surname "Gonzales17" :activity "music"}
-      {:name "Speedy18" :surname "Gonzales18" :activity "music"}
-      {:name "Speedy19" :surname "Gonzales19" :activity "music"}]])
+     (concat
+      [{:name "Stathis" :surname "Sideris" :activity "coding"}
+       {:name "Tom" :surname "Waits" :activity "music"}
+       {:name "Adam" :surname "Harris" :activity "music"}
+       {:name "Nick" :surname "Nolte" :activity "music"}
+       {:name "Cecil" :surname "Adams" :activity "music"}
+       {:name "Salvador" :surname "Dali" :activity "music"}
+       {:name "Speedy0" :surname "Gonzales0" :activity "music"}
+       {:name "Speedy1" :surname "Gonzales1" :activity "music"}
+       {:name "Speedy2" :surname "Gonzales2" :activity "music"}
+       {:name "Speedy3" :surname "Gonzales3" :activity "music"}
+       {:name "Speedy4" :surname "Gonzales4" :activity "music"}
+       {:name "Speedy5" :surname "Gonzales5" :activity "music"}
+       {:name "Speedy6" :surname "Gonzales6" :activity "music"}
+       {:name "Speedy7" :surname "Gonzales7" :activity "music"}
+       {:name "Speedy8" :surname "Gonzales8" :activity "music"}
+       {:name "Speedy9" :surname "Gonzales9" :activity "music"}
+       {:name "Speedy10" :surname "Gonzales10" :activity "music"}
+       {:name "Speedy11" :surname "Gonzales11" :activity "music"}
+       {:name "Speedy12" :surname "Gonzales12" :activity "music"}
+       {:name "Speedy13" :surname "Gonzales13" :activity "music"}
+       {:name "Speedy14" :surname "Gonzales14" :activity "music"}
+       {:name "Speedy15" :surname "Gonzales15" :activity "music"}
+       {:name "Speedy16" :surname "Gonzales16" :activity "music"}
+       {:name "Speedy17" :surname "Gonzales17" :activity "music"}
+       {:name "Speedy18" :surname "Gonzales18" :activity "music"}
+       {:name "Speedy19" :surname "Gonzales19" :activity "music"}])])
 
   (def the-data
     {:a             10000
@@ -569,6 +576,10 @@
             :ccccc "This is a test"})
 
   (def ins (inspect {:a [0 1 2 3]}))
-  (def ins (inspect the-data))
+  (def ins (inspect the-data
+                    {::scale    2
+                     ::cursor   [1]
+                     ::expanded #{[] [1]}}))
+  (set-data! ins the-data)
 
-)
+  )

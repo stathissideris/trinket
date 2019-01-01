@@ -23,6 +23,7 @@ Clojure data inspector
 - [ ] Realize lazy seqs in the background
 - [ ] Scroll to follow cursor
 - [ ] Don't draw outside visible area
+- [ ] BUG: clicking breaks view has been scaled
 - [ ] Table view
 - [ ] Customisable keys
 - [ ] Move drop/take code for paging lazy sequences out of drawing

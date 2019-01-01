@@ -40,6 +40,12 @@
   (layout [this]
     (throw (ex-info "layout not implemented for object" {:object this :type (type this)}))))
 
+(extend-type nil
+  Component
+  (paint! [this g])
+  (ideal-size [this] {::w 0 ::h 0})
+  (layout [this] this))
+
 (defn set-bounds! [^JComponent c {::keys [x y w h]}]
   (.setBounds c x y w h))
 
@@ -149,10 +155,10 @@
 (defn- transpose [rows]
   (apply map vector rows))
 
-(defn safe-max [& args]
-  (if (empty? args)
+(defn safe-max [coll]
+  (if (empty? coll)
     []
-    (apply max args)))
+    (apply max (remove nil? coll))))
 
 (defrecord Grid []
   Component
@@ -163,12 +169,12 @@
   (layout [{::keys [children columns] :as this}]
     (let [rows          (for [row (partition-all columns children)]
                           (for [child row]
-                            (layout child)))
+                            (when child (layout child))))
 
-          column-widths (mapv #(apply safe-max (map ::w %)) (transpose rows))
+          column-widths (mapv #(safe-max (map (fnil ::w {::w 0}) %)) (transpose rows))
           x-positions   (vec (reductions + 0 column-widths))
 
-          row-heights   (mapv #(apply safe-max (map ::h %)) rows)
+          row-heights   (mapv #(safe-max (map (fnil ::h {::h 0}) %)) rows)
           y-positions   (vec (reductions + 0 row-heights))]
 
       (assoc this
@@ -198,23 +204,29 @@
 (defn add-absolute-coords [ui]
   (let [z (zipper ui)]
     (loop [loc z]
-      (if (zip/end? loc)
-        (zip/root loc)
-        (-> (if-let [parent (some-> loc zip/up zip/node)]
-              (zip/edit loc (fn [{::keys [x y] :as node}]
-                              (assoc node
-                                     ::ax (+ x (::ax parent))
-                                     ::ay (+ y (::ay parent)))))
-              (zip/edit loc (fn [{::keys [x y] :as node}]
-                              (assoc node
-                                     ::ax (or x 0)
-                                     ::ay (or y 0)))))
-            zip/next
-            recur)))))
+      (cond (zip/end? loc)
+            (zip/root loc)
+
+            (nil? (zip/node loc))
+            (-> loc zip/next recur)
+
+            :else
+            (-> (if-let [parent (some-> loc zip/up zip/node)]
+                  (zip/edit loc (fn [{::keys [x y] :as node}]
+                                  (assoc node
+                                         ::ax (+ x (::ax parent))
+                                         ::ay (+ y (::ay parent)))))
+                  (zip/edit loc (fn [{::keys [x y] :as node}]
+                                  (assoc node
+                                         ::ax (or x 0)
+                                         ::ay (or y 0)))))
+                zip/next
+                recur)))))
 
 (defn point-within? [{px ::x py ::y} {::keys [ax ay w h]}]
-  (and (<= ax px (+ ax w))
-       (<= ay py (+ ay h))))
+  (when (and px py ax ay w h)
+    (and (<= ax px (+ ax w))
+         (<= ay py (+ ay h)))))
 
 (defn component-at-point [point ui]
   (let [z       (zipper ui)
