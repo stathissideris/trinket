@@ -19,19 +19,6 @@
                       ::show-indexes true
                       ::page-length  10})
 
-(defn- right-pad [^String s length]
-  (str s (apply str (repeat (- length (.length s)) " "))))
-
-(defn- update-vals [m fun]
-  (reduce-kv (fn [m k v]
-               (assoc m k (fun v)))
-             {} m))
-
-(defn- update-keys [m fun]
-  (reduce-kv (fn [m k v]
-               (assoc m (fun k) v))
-             {} m))
-
 (defn- lazy? [x] (or (instance? clojure.lang.LazySeq x)
                      (instance? clojure.lang.Cons x)))
 
