@@ -51,10 +51,8 @@
             ::ui/font  ui/font-regular
             ::ui/color ui/color-index}))
 
-(def lazy-indicator (annotation "L"))
-
 (defn- indicate-lazy [ui]
-  (ui/map->Horizontal {::ui/children [lazy-indicator ui]}))
+  (ui/map->Horizontal {::ui/children [(annotation "L") ui]}))
 
 (defn atom->ui [data path {::keys [text idx last-idx cursor page-length]}]
   (let [color (cond (keyword? data) ui/color-keywords
@@ -120,7 +118,7 @@
                    (let [value-ui (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
                                     (if (get expanded value-path)
                                       (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
-                                      (atom->ui v value-path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))))]
+                                      (data->ui v value-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor))))]
                      (if (and show-indexes (not suppress-indexes))
                        (ui/map->Horizontal
                         {::ui/children
@@ -576,6 +574,7 @@
             :ccccc "This is a test"})
 
   (def ins (inspect {:a [0 1 2 3]}))
+  (def ins (inspect the-data))
   (def ins (inspect the-data
                     {::scale    2
                      ::cursor   [1]
