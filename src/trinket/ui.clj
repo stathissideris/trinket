@@ -162,6 +162,22 @@
     []
     (apply max (remove nil? coll))))
 
+(defn- position-in-rect [{cw ::w
+                          ch ::h
+                          alignment ::alignment
+                          :as component
+                          :or {alignment "nw"}}
+                         {rx ::x
+                          ry ::y
+                          rw ::w
+                          rh ::h
+                          :as rect}]
+  (condp = alignment
+    "nw" {::x rx ::y ry}
+    "sw" {::x rx ::y (- (+ ry rh) ch)}
+    "ne" {::x (- (+ rx rw) cw) ::y ry}
+    "se" {::x (- (+ rx rw) cw) ::y (- (+ ry rh) ch)}))
+
 (defrecord Grid []
   Component
   (paint! [{::keys [x y children] :as this} g]
@@ -194,8 +210,11 @@
                   (for [[c-idx child] (map-indexed vector row)]
                     (when child
                       (let [x (get x-positions c-idx)
-                            y (get y-positions r-idx)]
-                        (assoc child ::x x ::y y)))))))))))
+                            y (get y-positions r-idx)
+                            w (get column-widths c-idx)
+                            h (get row-heights r-idx)]
+                        (merge child
+                               (position-in-rect child {::x x ::y y ::w w ::h h}))))))))))))
 
 (defn grow-bounds [{::keys [ax ay w h]} d]
   {::ax (- ax d)

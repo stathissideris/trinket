@@ -123,7 +123,7 @@
 
                    ;; closing
                    (if (= idx last-idx)
-                     (-> (ui/text closing) (assoc ::path path))
+                     (-> (ui/text closing) (assoc ::path path ::ui/alignment "sw"))
                      (ui/text " "))]})))}))))
 
 (defn- data-page [data path {::keys [page-length lengths offsets] :as options}]
@@ -192,7 +192,7 @@
 
               ;; closing
               (if (= idx last-idx)
-                (-> (ui/text "}") (assoc ::path path))
+                (-> (ui/text "}") (assoc ::path path ::ui/alignment "sw"))
                 (ui/text " "))])))}))))
 
 (defn paint-cursor [ui ^Graphics2D g]
@@ -583,7 +583,7 @@
                     {::scale    2
                      ::cursor   [1]
                      ::expanded #{[] [1]}}))
-  (set-data! ins the-data)
+  (set-data! the-data)
 
   (-> (ui/find-component @(:ui-atom @last-inspector) ::cursor)
       (dissoc ::ui/children)
