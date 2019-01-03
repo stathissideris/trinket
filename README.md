@@ -27,12 +27,22 @@ Clojure data inspector
 - [x] BUG: click to select tables
 - [x] Table view
 - [x] Table view styling
+- [ ] BUG: white background when zooming out
 - [ ] Table view navigation
 - [ ] Customisable keys
 - [ ] Move drop/take code for paging lazy sequences out of drawing
       code and into the event loop. This will allow us to constrain
       scrolling to not go beyond the end of the sequence. Also,
       drawing code should be very lightweight.
+- [ ] Improve rendering/scrolling speed for large data structures
+      (especially noticable with tables)
+- [ ] Shorten namespaced keys in tables by defining (and displaying)
+      ad-hoc unique aliases
+- [ ] Status area information on focused structure such as element
+      count
+- [ ] Paging for non-lazy structures
+- [ ] Turn keyword namespaces on and off
+- [ ] Sorting
 
 ## How to address both keys and values in nested data structures
 
