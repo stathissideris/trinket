@@ -43,6 +43,12 @@ Clojure data inspector
 - [ ] Paging for non-lazy structures
 - [ ] Turn keyword namespaces on and off
 - [ ] Sorting
+- [ ] BUG: can't go to parent of single-element sequence
+- [ ] Apply spec to data structure and render problematic
+      sub-structures/values
+- [ ] datafy/nav
+- [ ] view cljs data structures
+- [ ] barchart
 
 ## How to address both keys and values in nested data structures
 
