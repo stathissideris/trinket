@@ -216,13 +216,21 @@
                         (merge child
                                (position-in-rect child {::x x ::y y ::w w ::h h}))))))))))))
 
+(defn grid [options]
+  (map->Grid
+   (merge {::layout "grid"} options)))
+
 (defn horizontal [{::keys [children] :as options}]
   (map->Grid
-   (merge {::columns (count children)} options)))
+   (merge {::columns (count children)
+           ::layout  "horizontal"}
+          options)))
 
 (defn vertical [options]
   (map->Grid
-   (merge {::columns 1} options)))
+   (merge {::columns 1
+           ::layout "vertical"}
+          options)))
 
 (defn grow-bounds [{::keys [ax ay w h]} d]
   {::ax (- ax d)

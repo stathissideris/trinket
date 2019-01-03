@@ -74,7 +74,7 @@
          {::ui/children
           [(-> (annotation "TABLE")
                (assoc ::path path))
-           (ui/map->Grid
+           (ui/grid
             {::ui/column-padding 5
              ::ui/columns        (inc (count total-keys))
              ::ui/children
@@ -164,7 +164,7 @@
   (if-not (get expanded path)
     (atom->ui data path options)
     (let [last-idx (dec (count data))]
-      (ui/map->Grid
+      (ui/grid
        {::cursor  (= cursor path)
         ::tag     (collection-tag data)
         ::ui/columns 5
