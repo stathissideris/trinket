@@ -1,6 +1,7 @@
 (ns trinket.inspector
   (:require [trinket.ui :as ui]
             [trinket.path :as path]
+            [trinket.alias :as alias]
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
@@ -34,11 +35,23 @@
 
 (defmulti data->ui (fn [data path options] (collection-tag data)))
 
-(defn annotation [x]
-  (ui/text {::ui/text  (str x)
-            ::ui/size  8
-            ::ui/font  ui/font-regular
-            ::ui/color ui/color-index}))
+(defn annotation
+  ([x]
+   (annotation x 8))
+  ([x size]
+   (ui/text {::ui/text  (str x)
+             ::ui/size  size
+             ::ui/font  ui/font-regular
+             ::ui/color ui/color-index})))
+
+(defn mono-note
+  ([x]
+   (annotation x 8))
+  ([x size]
+   (ui/text {::ui/text  (str x)
+             ::ui/size  size
+             ::ui/font  ui/font-mono
+             ::ui/color ui/color-index})))
 
 (defn- indicate-lazy [ui]
   (ui/horizontal {::ui/children [(annotation "L") ui]}))
@@ -63,22 +76,35 @@
                   ::ui/underline underline})
         (config-component data path options))))
 
+(defn- aliases-panel [aliases]
+  (ui/vertical
+   {::ui/children
+    (for [[ns alias] (sort-by val aliases)]
+      (mono-note (str alias " = " ns) 10))}))
+
 (defn- tabular-data? [data]
   (every? map? data))
 
 (defn- data-table [data path {::keys [offset]
                               :as    options
                               :or    {offset 0}}]
-  (let [total-keys (sort (distinct (mapcat keys data)))]
+  (let [total-keys (sort (distinct (mapcat keys data)))
+        nss        (distinct (map namespace total-keys))
+        aliases    (alias/make-aliases nss)]
     (-> (ui/vertical
          {::ui/children
           [(-> (annotation "TABLE")
                (assoc ::path path))
+           (aliases-panel aliases)
            (ui/grid
             {::ui/column-padding 5
              ::ui/columns        (inc (count total-keys))
              ::ui/children
-             (concat [nil] (map #(atom->ui % nil (assoc options ::underline true)) total-keys)
+             (concat [nil] (map #(atom->ui %
+                                           nil
+                                           (assoc options
+                                                  ::underline true
+                                                  ::text (alias/shorten % aliases))) total-keys)
                      (mapcat (fn [idx row]
                                (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys)))
                              (range) data))})]})
@@ -173,8 +199,8 @@
     (let [last-idx (dec (count data))
           prefixed  (prefixed-map? data)]
       (ui/vertical
-       {::cursor  (= cursor path)
-        ::tag     (collection-tag data)
+       {::cursor      (= cursor path)
+        ::tag         (collection-tag data)
         ::ui/children
         [(when prefixed (ui/text (str "#:" (namespace (ffirst data)))))
          (ui/grid
@@ -195,7 +221,7 @@
                          (let [k-text (if prefixed
                                         (str ":" (name k))
                                         (pr-str k))]
-                          (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx ::cursor cursor))))
+                           (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx ::cursor cursor))))
 
                        (ui/text " ")
 
