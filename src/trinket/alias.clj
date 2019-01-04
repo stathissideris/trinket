@@ -30,8 +30,9 @@
           (recur (inc x))))))) ;;TODO constrain somehow
 
 (defn make-aliases [nss]
-  (or (make-substring-aliases nss)
-      (make-fragment-aliases nss)))
+  (when (seq nss)
+    (or (make-substring-aliases nss)
+        (make-fragment-aliases nss))))
 
 (defn shorten [k aliases]
   (if-let [a (get aliases (namespace k))]

@@ -89,13 +89,13 @@
                               :as    options
                               :or    {offset 0}}]
   (let [total-keys (sort (distinct (mapcat keys data)))
-        nss        (distinct (map namespace total-keys))
+        nss        (distinct (remove nil? (map namespace total-keys)))
         aliases    (alias/make-aliases nss)]
     (-> (ui/vertical
          {::ui/children
           [(-> (annotation "TABLE")
                (assoc ::path path))
-           (aliases-panel aliases)
+           (when aliases (aliases-panel aliases))
            (ui/grid
             {::ui/column-padding 5
              ::ui/columns        (inc (count total-keys))
