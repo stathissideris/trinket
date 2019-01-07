@@ -24,7 +24,7 @@
 (deftest layout-test
   (testing "horizontal layout"
     (is
-     (= #trinket.ui.Horizontal
+     (= #trinket.ui.Grid
         {::ui/x        10
          ::ui/y        10
          ::ui/w        60
@@ -55,7 +55,7 @@
                                     ::ui/ay   10}]}
         (ui/add-absolute-coords
          (ui/layout
-          (ui/map->Horizontal
+          (ui/horizontal
            {::ui/x 10
             ::ui/y 10
             ::ui/children
@@ -65,7 +65,7 @@
 
   (testing "vertical layout"
     (is
-     (= #trinket.ui.Vertical
+     (= #trinket.ui.Grid
         {::ui/x        10
          ::ui/y        10
          ::ui/w        40
@@ -96,7 +96,7 @@
                                     ::ui/ay   30}]}
         (ui/add-absolute-coords
          (ui/layout
-          (ui/map->Vertical
+          (ui/vertical
            {::ui/x 10
             ::ui/y 10
             ::ui/children
@@ -106,7 +106,7 @@
 
   (testing "vertical within horizontal"
     (is
-     (= #trinket.ui.Horizontal
+     (= #trinket.ui.Grid
         {::ui/x        10
          ::ui/y        10
          ::ui/ax       10
@@ -114,7 +114,7 @@
          ::ui/w        50
          ::ui/h        20
          ::ui/children
-         [#trinket.ui.Vertical
+         [#trinket.ui.Grid
           {::ui/x        0
            ::ui/y        0
            ::ui/ax       10
@@ -136,7 +136,7 @@
                                       ::ui/ay   20
                                       ::ui/w    20
                                       ::ui/h    10}]}
-          #trinket.ui.Vertical
+          #trinket.ui.Grid
           {::ui/x        30
            ::ui/y        0
            ::ui/ax       40
@@ -160,22 +160,22 @@
                                       ::ui/h    10}]}]}
         (ui/add-absolute-coords
          (ui/layout
-          (ui/map->Horizontal
+          (ui/horizontal
            {::ui/x 10
             ::ui/y 10
             ::ui/children
-            [(ui/map->Vertical
+            [(ui/vertical
               {::ui/children
                [(tt "aaa")
                 (tt "bb")]})
-             (ui/map->Vertical
+             (ui/vertical
               {::ui/children
                [(tt "a")
                 (tt "bb")]})]}))))))
 
   (testing "triple nesting"
     (is
-     (= #trinket.ui.Vertical
+     (= #trinket.ui.Grid
         {::ui/x        10
          ::ui/y        10
          ::ui/ax       10
@@ -190,7 +190,7 @@
                                     ::ui/ay   10
                                     ::ui/w    20
                                     ::ui/h    10}
-          #trinket.ui.Vertical
+          #trinket.ui.Grid
           {::ui/x        0
            ::ui/y        10
            ::ui/ax       10
@@ -205,7 +205,7 @@
                                       ::ui/ay   20
                                       ::ui/w    20
                                       ::ui/h    10}
-            #trinket.ui.Vertical
+            #trinket.ui.Grid
             {::ui/x        0
              ::ui/y        10
              ::ui/ax       10
@@ -222,15 +222,15 @@
                                         ::ui/h    10}]}]}]}
         (ui/add-absolute-coords
          (ui/layout
-          (ui/map->Vertical
+          (ui/vertical
            {::ui/x 10
             ::ui/y 10
             ::ui/children
             [(tt "x1")
-             (ui/map->Vertical
+             (ui/vertical
               {::ui/children
                [(tt "x2")
-                (ui/map->Vertical
+                (ui/vertical
                  {::ui/children
                   [(tt "x3")]})]})]}))))))
 
@@ -289,7 +289,7 @@
                                     ::ui/ay   30}]}
         (ui/add-absolute-coords
          (ui/layout
-          (ui/map->Grid
+          (ui/grid
            {::ui/x        10
             ::ui/y        10
             ::ui/columns  2

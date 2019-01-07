@@ -2,6 +2,7 @@
   (:require [trinket.ui :as ui]
             [trinket.path :as path]
             [trinket.alias :as alias]
+            [trinket.perf :as perf]
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
@@ -93,7 +94,9 @@
         aliases    (alias/make-aliases nss)]
     (-> (ui/vertical
          {::ui/children
-          [(-> (annotation "TABLE")
+          [(-> (annotation (str "TABLE"
+                                (when-not (lazy? data)
+                                  (str " (" (count data) " ROWS, " (count total-keys) " COLUMNS)"))))
                (assoc ::path path))
            (when aliases (aliases-panel aliases))
            (ui/grid
@@ -136,10 +139,12 @@
                      (ui/text (or indent-str " ")))
 
                    ;;value
-                   (let [value-ui (let [options (dissoc options ::suppress-indexes)] ;;suppress-indexes is for one-level only
+                   (let [value-ui (let [options (-> options
+                                                    (dissoc ::suppress-indexes) ;;suppress-indexes is for one-level only
+                                                    (assoc ::idx idx ::last-idx last-idx ::cursor cursor))]
                                     (if (get expanded value-path)
                                       (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
-                                      (data->ui v value-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor))))]
+                                      (data->ui v value-path options)))]
                      (if (and show-indexes (not suppress-indexes))
                        (ui/horizontal
                         {::ui/children
@@ -440,49 +445,63 @@
       ui/layout
       ui/add-absolute-coords))
 
+(defn- trigger-repaint [{::ui/keys [w h] :as new-ui} scale ^JPanel panel ^JFrame frame]
+  (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
+  ;;(.revalidate panel)
+  (.repaint frame))
+
 (defn inspect
   ([data]
    (inspect data {}))
   ([data options]
-   (let [data-atom     (atom data)
-         options-atom  (atom (merge default-options options))
-         ui-atom       (atom (make-new-ui data @options-atom))
-         ^JPanel panel (doto (proxy [JPanel] []
-                               (paintComponent [^Graphics2D g]
-                                 (let [ui @ui-atom
-                                       f  (::scale @options-atom)]
-                                   (doto g
-                                     (.scale f f)
-                                     (.setColor ui/color-background)
-                                     (.fillRect -2 -2
-                                                (+ 2 (.getWidth ^JPanel this))
-                                                (+ 2 (.getHeight ^JPanel this))))
-                                   (#'paint-cursor ui g)
-                                   (ui/paint! ui g)))))
-         frame         (doto (JFrame. "trinket")
-                         (.add (doto (JScrollPane. panel)
-                                 ((fn [sp]
-                                    (.setUnitIncrement (.getVerticalScrollBar ^JScrollPane sp) 16)
-                                    (.setUnitIncrement (.getHorizontalScrollBar ^JScrollPane sp) 8)))))
-                         (.setSize 400 600))
-         inspector     (->Inspector data-atom options-atom ui-atom frame)]
+   (let [data-atom       (atom data)
+         options-atom    (atom (merge default-options options))
+         ui-atom         (atom (make-new-ui data @options-atom))
+         sp              (atom nil)
+         ^JPanel panel   (proxy [JPanel] []
+                           (paintComponent [^Graphics2D g]
+                             (let [ui              @ui-atom
+                                   f               (::scale @options-atom)
+                                   ^JScrollPane sp @sp
+                                   scroll-pos      (-> sp .getViewport .getViewPosition)
+                                   sx              (.-x scroll-pos)
+                                   sy              (.-y scroll-pos)
+                                   view-size       (-> sp .getViewport .getViewSize)
+                                   vw              (.-width view-size)
+                                   vh              (.-height view-size)]
+                               (doto g
+                                 (.setClip (- sx 2) (- sy 2) (+ 10 vw) (+ 10 vh))
+                                 (.scale f f)
+                                 (.setColor ui/color-background)
+                                 (.fillRect -2 -2
+                                            (+ 10 (.getWidth ^JPanel this))
+                                            (+ 10 (.getHeight ^JPanel this))))
+                               (#'paint-cursor ui g)
+                               (ui/paint! ui g))))
+         ^JScrollPane sp (reset! sp (doto (JScrollPane. panel)
+                                      ((fn [sp]
+                                         (.setUnitIncrement (.getVerticalScrollBar ^JScrollPane sp) 16)
+                                         (.setUnitIncrement (.getHorizontalScrollBar ^JScrollPane sp) 8)))))
+         ^JFrame frame   (doto (JFrame. "trinket")
+                           (.add sp)
+                           (.setSize 400 600))
+         inspector       (->Inspector data-atom options-atom ui-atom frame)]
 
      ;;connected atoms
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
-                  (let [{::keys [scale] :as options} @options-atom
-                        {::ui/keys [w h] :as new-ui} (make-new-ui data options)]
-                    (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
-                    (reset! ui-atom new-ui)
-                    (.revalidate panel)
-                    (.repaint frame))))
+                  (let [{::keys [scale] :as options} @options-atom]
+                    (future
+                      (let [new-ui (make-new-ui data options)]
+                        (reset! ui-atom new-ui)
+                        (ui/later (trigger-repaint new-ui scale panel frame)))))))
+
      (add-watch options-atom ::inspector-ui
-                (fn [_ _ _ {::keys [scale] :as options}]
-                  (let [{::ui/keys [w h] :as new-ui} (make-new-ui @data-atom options)]
-                    (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
-                    (reset! ui-atom new-ui)
-                    (.revalidate panel)
-                    (.repaint frame))))
+                (fn [_ _ old-options {::keys [scale] :as options}]
+                  (future
+                    (let [new-ui (make-new-ui @data-atom options)]
+                      (reset! ui-atom new-ui)
+                      (ui/later (trigger-repaint new-ui scale panel frame))))))
 
      ;;listeners
      (doto panel
@@ -628,4 +647,6 @@
   (-> (ui/find-component @(:ui-atom @last-inspector) ::cursor)
       (dissoc ::ui/children)
       (clojure.pprint/pprint))
+
+  (def ins (inspect (clojure.edn/read-string (slurp "/Users/sideris/devel/work/gt/gt-ingest/ingest-service/test-resources/CH2PRSKNT100000012954708-coerced.edn"))))
   )

@@ -1,7 +1,8 @@
 (ns trinket.ui
-  (:import [java.awt Graphics2D Color Font]
-           [javax.swing JComponent JLabel])
-  (:require [clojure.zip :as zip]))
+  (:require [clojure.zip :as zip]
+            [trinket.perf :as perf])
+  (:import [java.awt Graphics2D Color Font Rectangle]
+           [javax.swing SwingUtilities JComponent JLabel]))
 
 (def default-font-size 11)
 (def font-size (atom default-font-size))
@@ -18,6 +19,16 @@
 
 (def font-mono (Font. "Monaco" Font/PLAIN default-font-size))
 (def font-regular (Font. "Lucinda Grande" Font/PLAIN default-font-size))
+
+(defmacro later [& exprs]
+  `(SwingUtilities/invokeLater (fn [] ~@exprs)))
+
+(defmacro later-val [& exprs]
+  `(let [promise# (promise)]
+     (SwingUtilities/invokeLater
+      (fn []
+        (deliver promise# (do ~@exprs))))
+     promise#))
 
 (defmacro save-transform [g & body]
   `(let [g#  ~g
@@ -72,31 +83,51 @@
 
 (def derive-font
   (memoize
-   (fn [font size]
+   (fn [^Font font size]
      (.deriveFont font (float size)))))
+
+(defn- fully-outside-clip? [ax ay w h ^Rectangle clip]
+  (let [cx       (.-x clip)
+        cy       (.-y clip)
+        cw       (.-width clip)
+        ch       (.-height clip)
+        c-left   (+ cx cw)
+        c-bottom (+ cy ch)]
+    (or (> ax c-left)
+        (> ay c-bottom)
+        (< (+ ax w) cx)
+        (< (+ ay h) cy))))
+
+;;(def fully-outside-clip? (memoize fully-outside-clip?*))
 
 (defrecord Text []
   Component
-  (paint! [{::keys [text selected font size color underline] :as this} g]
-    (if underline
-      (.setText text-stamp (str "<html><u>" text "</u></html>"))
-      (.setText text-stamp text))
-    (if selected
-      (doto text-stamp
-        (.setOpaque true)
-        (.setBackground color-selection-background))
-      (doto text-stamp
-        (.setOpaque false)))
-    (-> text-stamp (.setFont (or font font-mono)))
-    (when size
-      (.setFont text-stamp (-> text-stamp .getFont (derive-font size))))
-    (if color
-      (.setForeground text-stamp color)
-      (.setForeground text-stamp color-text))
-    (paint-at! text-stamp g this))
+  (paint! [{::keys [text ax ay w h selected font size color underline] :as this} g]
+    (when-not (perf/acc :clip-check (fully-outside-clip? ax ay w h (.getClipBounds ^Graphics2D g)))
+      (perf/acc
+       :prepare-label
+       (do
+         (if underline
+           (.setText text-stamp (str "<html><u>" text "</u></html>"))
+           (.setText text-stamp text))
+         (if selected
+           (doto text-stamp
+             (.setOpaque true)
+             (.setBackground color-selection-background))
+           (doto text-stamp
+             (.setOpaque false)))
+         (-> text-stamp (.setFont (or font font-mono)))
+         (when size
+           (.setFont text-stamp (-> text-stamp .getFont (derive-font size))))
+         (if color
+           (.setForeground text-stamp color)
+           (.setForeground text-stamp color-text))))
+      (perf/acc
+       :paint-at
+       (paint-at! text-stamp g this))))
   (ideal-size [this]
-    (.setText text-stamp (::text this))
-    (ideal-size text-stamp))
+    {::w (* 7 (.length (::text this)))
+     ::h 15})
   (layout [this]
     (merge this (ideal-size this))))
 
@@ -107,52 +138,6 @@
         (merge (->Text) x)
         :else
         (assoc (->Text) ::text (str x))))
-
-(defn right-of [{::keys [x y w]}]
-  {::x (+ x (or w 0)) ::y y})
-
-(defn linear-arrange [children next-pos]
-  (if (empty? children)
-    children
-    (let [first-c (-> children first (assoc ::x 0 ::y 0) layout)]
-      (reduce (fn [children child]
-                (conj children (layout (merge child (next-pos (last children))))))
-              [first-c] (rest children)))))
-
-(defrecord Horizontal []
-  Component
-  (paint! [{::keys [x y children] :as this} g]
-    (doseq [c (remove nil? children)] (paint! c g)))
-  (ideal-size [this]
-    (layout this))
-  (layout [{::keys [x y children] :as this}]
-    (let [children (remove nil? children)]
-      (if (empty? children)
-        (assoc this ::w 0 ::h 0)
-        (let [new-children (linear-arrange children right-of)]
-          (assoc this
-                 ::children new-children
-                 ::w (apply + (map ::w new-children))
-                 ::h (apply max (map ::h new-children))))))))
-
-(defn below-of [{::keys [x y h]}]
-  {::x x ::y (+ y (or h 0))})
-
-(defrecord Vertical []
-  Component
-  (paint! [{::keys [x y children] :as this} g]
-    (doseq [c (remove nil? children)] (paint! c g)))
-  (ideal-size [this]
-    (layout this))
-  (layout [{::keys [x y children] :as this}]
-    (let [children (remove nil? children)]
-      (if (empty? children)
-        (assoc this ::w 0 ::h 0)
-        (let [new-children (linear-arrange children below-of)]
-          (assoc this
-                 ::children new-children
-                 ::w (apply max (map ::w new-children))
-                 ::h (apply + (map ::h new-children))))))))
 
 (defn- transpose [rows]
   (apply map vector rows))
@@ -180,8 +165,8 @@
 
 (defrecord Grid []
   Component
-  (paint! [{::keys [x y children] :as this} g]
-    (doseq [child children] (paint! child g)))
+  (paint! [{::keys [children] :as this} g]
+    (perf/acc :child-iterate (doseq [child children] (paint! child g))))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [children columns column-padding]
@@ -205,16 +190,16 @@
              ::h (apply + row-heights)
              ::children
              (apply concat
-              (for [[r-idx row] (map-indexed vector rows)]
-                (when row
-                  (for [[c-idx child] (map-indexed vector row)]
-                    (when child
-                      (let [x (get x-positions c-idx)
-                            y (get y-positions r-idx)
-                            w (get column-widths c-idx)
-                            h (get row-heights r-idx)]
-                        (merge child
-                               (position-in-rect child {::x x ::y y ::w w ::h h}))))))))))))
+                    (for [[r-idx row] (map-indexed vector rows)]
+                      (when row
+                        (for [[c-idx child] (map-indexed vector row)]
+                          (when child
+                            (let [x (get x-positions c-idx)
+                                  y (get y-positions r-idx)
+                                  w (get column-widths c-idx)
+                                  h (get row-heights r-idx)]
+                              (merge child
+                                     (position-in-rect child {::x x ::y y ::w w ::h h}))))))))))))
 
 (defn grid [options]
   (map->Grid
