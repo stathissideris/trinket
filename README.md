@@ -22,21 +22,21 @@ Clojure data inspector
 - [x] Place cursor at root of data when starting
 - [ ] Realize lazy seqs in the background
 - [ ] Scroll to follow cursor
-- [ ] Don't draw outside visible area
+- [x] Don't draw outside visible area
 - [x] BUG: clicking breaks view has been scaled
 - [x] BUG: click to select tables
 - [x] Table view
 - [x] Table view styling
-- [ ] BUG: white background when zooming out
+- [x] BUG: white background when zooming out
 - [ ] Table view navigation
 - [ ] Customisable keys
 - [ ] Move drop/take code for paging lazy sequences out of drawing
       code and into the event loop. This will allow us to constrain
       scrolling to not go beyond the end of the sequence. Also,
       drawing code should be very lightweight.
-- [ ] Improve rendering/scrolling speed for large data structures
+- [x] Improve rendering/scrolling speed for large data structures
       (especially noticable with tables)
-- [ ] Shorten namespaced keys in tables by defining (and displaying)
+- [x] Shorten namespaced keys in tables by defining (and displaying)
       ad-hoc unique aliases
 - [ ] Status area information on focused structure such as element
       count

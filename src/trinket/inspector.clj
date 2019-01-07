@@ -492,7 +492,8 @@
          ^JPanel panel   (proxy [JPanel] []
                            (paintComponent [^Graphics2D g]
                              (let [ui              @ui-atom
-                                   f               (::scale @options-atom)
+                                   scale           (::scale @options-atom)
+                                   f               scale
                                    ^JScrollPane sp @sp
                                    scroll-pos      (-> sp .getViewport .getViewPosition)
                                    sx              (.-x scroll-pos)
@@ -505,8 +506,8 @@
                                  (.scale f f)
                                  (.setColor ui/color-background)
                                  (.fillRect -2 -2
-                                            (+ 10 (.getWidth ^JPanel this))
-                                            (+ 10 (.getHeight ^JPanel this))))
+                                            (* (/ 1.0 scale) (+ 10 (.getWidth ^JPanel this)))
+                                            (* (/ 1.0 scale) (+ 10 (.getHeight ^JPanel this)))))
                                (#'paint-cursor ui (::cursor @options-atom) g)
                                (ui/paint! ui g))))
          ^JScrollPane sp (reset! sp (doto (JScrollPane. panel)
