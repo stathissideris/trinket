@@ -1,5 +1,6 @@
 (ns trinket.inspector
-  (:require [trinket.ui :as ui]
+  (:require [trinket]
+            [trinket.ui :as ui]
             [trinket.path :as path]
             [trinket.alias :as alias]
             [trinket.perf :as perf]
@@ -406,7 +407,7 @@
                  (fn [x]
                    (inc (or x page-length)))))
 
-(defn- key-pressed [{:keys [ui-atom options-atom] :as inspector} ^KeyEvent e]
+(defn- key-pressed [{:keys [data-atom ui-atom options-atom] :as inspector} ^KeyEvent e]
   (let [expand-fn #(when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
                      (toggle-expansion! inspector (cursor inspector)))]
     (condp = (.getKeyCode e)
@@ -445,6 +446,9 @@
       KeyEvent/VK_MINUS  (if (is-shortcut-down? e)
                            (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
                            (show-less! inspector (cursor inspector) @options-atom))
+
+      KeyEvent/VK_D      (alter-var-root #'trinket/x (fn [_] (path/get-in @data-atom (cursor inspector))))
+
       ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
       ;; \0 (reset! font-size default-font-size)
       ;; \= (swap! font-size inc)
