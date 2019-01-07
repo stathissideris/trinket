@@ -11,7 +11,12 @@
            [java.awt.datatransfer StringSelection]
            [javax.swing JPanel JFrame JScrollPane JScrollBar BorderFactory]))
 
+(def debug false)
+
 (set! *warn-on-reflection* true)
+
+(defn dbg [s]
+  (when debug (println s)))
 
 (defonce last-inspector (atom nil))
 
@@ -63,8 +68,7 @@
                    ::index idx
                    ::tag (collection-tag data))
     (and idx (zero? idx)) (assoc ::first true)
-    (and idx (= idx last-idx)) (assoc ::last true)
-    (and cursor (= cursor path)) (assoc ::cursor true)))
+    (and idx (= idx last-idx)) (assoc ::last true)))
 
 (defn atom->ui [data path {::keys [text page-length underline] :as options}]
   (let [color (cond (keyword? data) ui/color-keywords
@@ -119,7 +123,7 @@
                                  :or {offset 0}
                                  :as options}]
   (cond (not (get expanded path))
-        (atom->ui data path (merge options {::idx idx ::last-idx last-idx ::cursor cursor}))
+        (atom->ui data path (merge options {::idx idx ::last-idx last-idx}))
 
         (and (get tables path) (tabular-data? data))
         (data-table data path options)
@@ -127,8 +131,8 @@
         :else
         (let [last-idx (dec (count data))]
           (ui/vertical
-           {::cursor      (= cursor path)
-            ::tag         (collection-tag data)
+           {::tag         (collection-tag data)
+            ::path        path
             ::ui/children
             (for [[idx v] (map-indexed vector data)]
               (let [value-path (conj path idx)]
@@ -136,13 +140,13 @@
                  {::ui/children
                   [;;opening
                    (if (zero? idx)
-                     (-> (ui/text opening) (assoc ::path path)) ;; assoc path to allow mouse selection of whole map
+                     (-> (ui/text opening) (assoc ::click-path path)) ;; assoc path to allow mouse selection of whole map
                      (ui/text (or indent-str " ")))
 
                    ;;value
                    (let [value-ui (let [options (-> options
                                                     (dissoc ::suppress-indexes) ;;suppress-indexes is for one-level only
-                                                    (assoc ::idx idx ::last-idx last-idx ::cursor cursor))]
+                                                    (assoc ::idx idx ::last-idx last-idx))]
                                     (if (get expanded value-path)
                                       (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
                                       (data->ui v value-path options)))]
@@ -155,7 +159,7 @@
 
                    ;; closing
                    (if (= idx last-idx)
-                     (-> (ui/text closing) (assoc ::path path ::ui/alignment "sw"))
+                     (-> (ui/text closing) (assoc ::click-path path ::ui/alignment "sw"))
                      (ui/text " "))]})))}))))
 
 (defn- data-page [data path {::keys [page-length lengths offsets] :as options}]
@@ -205,12 +209,12 @@
     (let [last-idx (dec (count data))
           prefixed  (prefixed-map? data)]
       (ui/vertical
-       {::cursor      (= cursor path)
-        ::tag         (collection-tag data)
+       {::tag         (collection-tag data)
+        ::path        path
         ::ui/children
         [(when prefixed (ui/text (str "#:" (namespace (ffirst data)))))
          (ui/grid
-          {::ui/columns 5
+          {::ui/columns  5
            ::ui/children
            (vec
             (apply concat
@@ -219,7 +223,7 @@
                            val-path (conj path idx ::path/val)]
                        [ ;;opening
                         (if (zero? idx)
-                          (-> (ui/text "{") (assoc ::path path)) ;;assoc path to allow mouse selection of whole map
+                          (-> (ui/text "{") (assoc ::click-path path)) ;;assoc path to allow mouse selection of whole map
                           (ui/text " "))
 
                         ;;key
@@ -228,22 +232,20 @@
                           (let [k-text (if prefixed
                                          (str ":" (name k))
                                          (pr-str k))]
-                            (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx ::cursor cursor))))
+                            (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx))))
 
                         (ui/text " ")
 
                         ;;value
-                        (if (get expanded val-path)
-                          (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
-                          (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::cursor cursor)))
+                        (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
 
                         ;; closing
                         (if (= idx last-idx)
-                          (-> (ui/text "}") (assoc ::path path ::ui/alignment "sw"))
+                          (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw"))
                           (ui/text " "))]))))})]}))))
 
-(defn paint-cursor [ui ^Graphics2D g]
-  (when-let [match (ui/find-component ui ::cursor)]
+(defn paint-cursor [ui path ^Graphics2D g]
+  (when-let [match (ui/find-component ui #(= path (::path %)))]
     (let [cursor (ui/grow-bounds match 1)]
       (doto g
         (.setColor ui/color-selection-background)
@@ -296,31 +298,39 @@
 (defn- cursor [{:keys [options-atom] :as inspector}]
   (::cursor @options-atom))
 
-(defn- move-cursor! [{:keys [ui-atom] :as inspector} direction]
-  (let [ui @ui-atom]
+(defn- move-cursor! [{:keys [ui-atom options-atom] :as inspector} direction]
+  (let [ui       @ui-atom
+        cur      (cursor inspector)
+        cur-comp (ui/find-component ui #(= cur (::path %)))]
     (cond
       ;; going in!
       (= :in direction)
-      (let [tag (::tag (ui/find-component ui ::cursor))]
-        (when (and (not= tag :atom) (expanded? inspector (cursor inspector)))
+      (let [tag (::tag cur-comp)]
+        (when (and (not= tag :atom) (expanded? inspector cur))
           (if (= tag :map)
             (swap-options! inspector update ::cursor conj 0 ::path/key)
             (swap-options! inspector update ::cursor conj 0))))
 
       ;; left to go from map value to map key
-      (and (= :left direction) (path/val? (cursor inspector)))
-      (swap-options! inspector update ::cursor path/point-to-key)
+      (and (= :left direction) (path/val? cur))
+      (do
+        (dbg "left to go from map value to map key")
+        (swap-options! inspector update ::cursor path/point-to-key))
 
       ;; right to go from map key to map value
-      (and (= :right direction) (path/key? (cursor inspector)))
-      (swap-options! inspector update ::cursor path/point-to-val)
+      (and (= :right direction) (path/key? cur))
+      (do
+        (dbg "right to go from map key to map value")
+        (swap-options! inspector update ::cursor path/point-to-val))
 
       ;; up to go to previous key or value
-      (and (= :up direction) (not (::first (ui/find-component ui ::cursor))))
-      (swap-options! inspector update ::cursor path/left)
+      (and (= :up direction) (not (::first cur-comp)))
+      (do
+        (dbg "up to go to previous key or value")
+        (swap-options! inspector update ::cursor path/left))
 
       ;; down to go to next key or value
-      (and (= :down direction) (not (::last (ui/find-component ui ::cursor))))
+      (and (= :down direction) (not (::last cur-comp)))
       (swap-options! inspector update ::cursor path/right)
 
       ;; down on the last element to go up again - disabled for now, I think this is confusing
@@ -328,12 +338,16 @@
       ;; (swap-options! inspector update ::cursor path/up)
 
       ;; left to get out of structure
-      (and (#{:left :up} direction) (::first (ui/find-component ui ::cursor)))
-      (swap-options! inspector update ::cursor path/up)
+      (and (#{:left :up} direction) (::first cur-comp))
+      (do
+        (dbg "left to get out of structure")
+        (swap-options! inspector update ::cursor path/up))
 
       ;; left to go to top of structure
-      (and (= :left direction) (not (::first (ui/find-component ui ::cursor))))
-      (swap-options! inspector update ::cursor path/first)
+      (and (= :left direction) (not (::first cur-comp)))
+      (do
+        (dbg "left to go to top of structure")
+        (swap-options! inspector update ::cursor path/first))
 
       ;; right to go to bottom of structure
       ;;(and (= :right direction) (not (::last (ui/find-component ui ::cursor))))
@@ -341,22 +355,23 @@
 
       ;; right or down to go into structure
       (#{:right :down} direction)
-      (let [tag (::tag (ui/find-component ui ::cursor))]
-        (when (and (not= tag :atom) (expanded? inspector (cursor inspector)))
+      (let [tag (::tag cur-comp)]
+        (dbg "right or down to go into structure")
+        (when (and (not= tag :atom) (expanded? inspector cur))
           (if (= tag :map)
             (swap-options! inspector update ::cursor conj 0 ::path/key)
             (swap-options! inspector update ::cursor conj 0))))
 
-      :else nil)))
+      :else                                              nil)))
 
 (defn- mouse-clicked [{:keys [ui-atom options-atom] :as inspector} ^MouseEvent e]
   (when-let [match (ui/component-at-point
                     {::ui/x (.getX e) ::ui/y (.getY e)}
                     (ui/scale @ui-atom (::scale @options-atom)))] ;;scale so that clicks land correctly ;;TODO OPTIMIZE!!!
     (condp = (.getClickCount e)
-      1 (swap-options! inspector assoc ::cursor (::path match))
+      1 (swap-options! inspector assoc ::cursor (::click-path match))
       2 (when-not (= :atom (::tag match))
-          (toggle-expansion! inspector (::path match)))
+          (toggle-expansion! inspector (::click-path match)))
       nil)))
 
 (defn mouse-listener [{:keys [ui-atom] :as inspector}]
@@ -452,6 +467,11 @@
   ;;(.revalidate panel)
   (.repaint frame))
 
+(defn- only-diff? [old new k]
+  (and (not= (get old k) (get new k))
+       (= (dissoc old k)
+          (dissoc new k))))
+
 (defn inspect
   ([data]
    (inspect data {}))
@@ -478,7 +498,7 @@
                                  (.fillRect -2 -2
                                             (+ 10 (.getWidth ^JPanel this))
                                             (+ 10 (.getHeight ^JPanel this))))
-                               (#'paint-cursor ui g)
+                               (#'paint-cursor ui (::cursor @options-atom) g)
                                (ui/paint! ui g))))
          ^JScrollPane sp (reset! sp (doto (JScrollPane. panel)
                                       ((fn [sp]
@@ -501,9 +521,11 @@
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ old-options {::keys [scale] :as options}]
                   (future
-                    (let [new-ui (make-new-ui @data-atom options)]
-                      (reset! ui-atom new-ui)
-                      (ui/later (trigger-repaint new-ui scale panel frame))))))
+                    (if (only-diff? old-options options ::cursor)
+                      (ui/later (trigger-repaint @ui-atom scale panel frame))
+                      (let [new-ui (make-new-ui @data-atom options)]
+                        (reset! ui-atom new-ui)
+                        (ui/later (trigger-repaint new-ui scale panel frame)))))))
 
      ;;listeners
      (doto panel
