@@ -49,6 +49,10 @@ Clojure data inspector
 - [ ] datafy/nav
 - [ ] view cljs data structures
 - [ ] barchart
+- [ ] show aliases on mixed single maps
+- [ ] turn aliases on and off
+- [ ] BUG: broken scrolling in lazy data structures
+- [x] BUG: keywords can be "expanded"
 
 ## How to address both keys and values in nested data structures
 

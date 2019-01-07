@@ -408,8 +408,10 @@
                    (inc (or x page-length)))))
 
 (defn- key-pressed [{:keys [data-atom ui-atom options-atom] :as inspector} ^KeyEvent e]
-  (let [expand-fn #(when-not (= :atom (::tag (ui/find-component @ui-atom ::cursor)))
-                     (toggle-expansion! inspector (cursor inspector)))]
+  (let [cur       (cursor inspector)
+        expand-fn (fn []
+                    (when-not (= :atom (::tag (ui/find-component @ui-atom #(= cur (::path %)))))
+                      (toggle-expansion! inspector (cursor inspector))))]
     (condp = (.getKeyCode e)
       KeyEvent/VK_TAB    (expand-fn)
       KeyEvent/VK_ENTER  (if (.isShiftDown e)
@@ -430,7 +432,7 @@
       KeyEvent/VK_LEFT   (move-cursor! inspector :left)
       KeyEvent/VK_RIGHT  (let [ui @ui-atom]
                            (if (and (not (expanded? inspector (cursor inspector)))
-                                    (not= :atom (::tag (ui/find-component ui ::cursor))))
+                                    (not= :atom (::tag (ui/find-component @ui-atom #(= cur (::path %))))))
                              (expand! inspector (cursor inspector))
                              (move-cursor! inspector :right)))
       KeyEvent/VK_UP     (move-cursor! inspector :up)
