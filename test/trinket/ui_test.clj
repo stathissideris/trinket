@@ -31,6 +31,8 @@
          ::ui/h        10
          ::ui/ax       10
          ::ui/ay       10
+         ::ui/columns 3
+         ::ui/layout "horizontal"
          ::ui/children
          [#trinket.ui_test.EasyText{::ui/text "aa"
                                     ::ui/x    0
@@ -72,6 +74,8 @@
          ::ui/h        30
          ::ui/ax       10
          ::ui/ay       10
+         ::ui/columns  1
+         ::ui/layout   "vertical"
          ::ui/children
          [#trinket.ui_test.EasyText{::ui/text "aaa"
                                     ::ui/x    0
@@ -113,6 +117,8 @@
          ::ui/ay       10
          ::ui/w        50
          ::ui/h        20
+         ::ui/layout   "horizontal"
+         ::ui/columns  2
          ::ui/children
          [#trinket.ui.Grid
           {::ui/x        0
@@ -121,6 +127,8 @@
            ::ui/ay       10
            ::ui/w        30
            ::ui/h        20
+           ::ui/layout   "vertical"
+           ::ui/columns  1
            ::ui/children
            [#trinket.ui_test.EasyText{::ui/text "aaa"
                                       ::ui/x    0
@@ -143,6 +151,8 @@
            ::ui/ay       10
            ::ui/w        20
            ::ui/h        20
+           ::ui/layout   "vertical"
+           ::ui/columns  1
            ::ui/children
            [#trinket.ui_test.EasyText{::ui/text "a"
                                       ::ui/x    0
@@ -182,6 +192,8 @@
          ::ui/ay       10
          ::ui/w        20
          ::ui/h        30
+         ::ui/layout   "vertical"
+         ::ui/columns  1
          ::ui/children
          [#trinket.ui_test.EasyText{::ui/text "x1"
                                     ::ui/x    0
@@ -197,6 +209,8 @@
            ::ui/ay       20
            ::ui/w        20
            ::ui/h        20
+           ::ui/layout   "vertical"
+           ::ui/columns  1
            ::ui/children
            [#trinket.ui_test.EasyText{::ui/text "x2"
                                       ::ui/x    0
@@ -212,6 +226,8 @@
              ::ui/ay       30
              ::ui/w        20
              ::ui/h        10
+             ::ui/layout   "vertical"
+             ::ui/columns  1
              ::ui/children
              [#trinket.ui_test.EasyText{::ui/text "x3"
                                         ::ui/x    0
@@ -244,6 +260,7 @@
          ::ui/w        40
          ::ui/h        30
          ::ui/columns  2
+         ::ui/layout   "grid"
          ::ui/children
          [#trinket.ui_test.EasyText{::ui/text "aa"
                                     ::ui/x    0

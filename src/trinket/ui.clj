@@ -144,7 +144,7 @@
 
 (defn safe-max [coll]
   (if (empty? coll)
-    []
+    0
     (apply max (remove nil? coll))))
 
 (defn- position-in-rect [{cw ::w
@@ -163,6 +163,18 @@
     "ne" {::x (- (+ rx rw) cw) ::y ry}
     "se" {::x (- (+ rx rw) cw) ::y (- (+ ry rh) ch)}))
 
+(defn- map-grid [rows columns fun v]
+  (let [vv (transient v)]
+    (loop [r 0]
+      (when-not (= r rows)
+        (loop [c 0]
+          (when-not (= c columns)
+            (let [idx (+ (* r columns) c)]
+              (assoc! vv idx (fun r c (get vv idx))))
+            (recur (inc c))))
+        (recur (inc r))))
+    (persistent! vv)))
+
 (defrecord Grid []
   Component
   (paint! [{::keys [children] :as this} g]
@@ -172,34 +184,38 @@
   (layout [{::keys [children columns column-padding]
             :or    {column-padding 0}
             :as    this}]
-    (let [rows          (for [row (partition-all columns children)]
-                          (for [child row]
-                            (when child (layout child))))
+    (let [laid-out      (mapv #(when % (layout %)) children)
+          row-count     (int (Math/ceil (/ (count children) columns)))
+          column-widths (vec
+                         (for [c (range columns)]
+                           (safe-max
+                            (for [r (range row-count)]
+                              (-> laid-out (nth (+ (* r columns) c)) (get ::w 0) (+ column-padding))))))
 
-          column-widths (mapv #(safe-max (->> %
-                                              (map (fnil ::w {::w 0}))
-                                              (map (partial + column-padding))))
-                              (transpose rows))
           x-positions   (vec (reductions + 0 column-widths))
 
-          row-heights   (mapv #(safe-max (map (fnil ::h {::h 0}) %)) rows)
+          row-heights   (vec
+                         (for [r (range row-count)]
+                           (safe-max
+                            (for [c (range columns)]
+                              (-> laid-out (nth (+ (* r columns) c)) (get ::h 0))))))
           y-positions   (vec (reductions + 0 row-heights))]
 
       (assoc this
              ::w (apply + column-widths)
              ::h (apply + row-heights)
              ::children
-             (apply concat
-                    (for [[r-idx row] (map-indexed vector rows)]
-                      (when row
-                        (for [[c-idx child] (map-indexed vector row)]
-                          (when child
-                            (let [x (get x-positions c-idx)
-                                  y (get y-positions r-idx)
-                                  w (get column-widths c-idx)
-                                  h (get row-heights r-idx)]
-                              (merge child
-                                     (position-in-rect child {::x x ::y y ::w w ::h h}))))))))))))
+             (map-grid row-count
+                       columns
+                       (fn [r c child]
+                         (when child
+                           (let [x (get x-positions c)
+                                 y (get y-positions r)
+                                 w (get column-widths c)
+                                 h (get row-heights r)]
+                             (merge child
+                                    (position-in-rect child {::x x ::y y ::w w ::h h})))))
+                       laid-out)))))
 
 (defn grid [options]
   (map->Grid
@@ -240,9 +256,12 @@
             :else
             (-> (if-let [parent (some-> loc zip/up zip/node)]
                   (zip/edit loc (fn [{::keys [x y] :as node}]
-                                  (assoc node
-                                         ::ax (+ x (::ax parent))
-                                         ::ay (+ y (::ay parent)))))
+                                  (try
+                                   (assoc node
+                                          ::ax (+ x (::ax parent))
+                                          ::ay (+ y (::ay parent)))
+                                   (catch Exception e
+                                     (throw (ex-info "Error" {:node node} e))))))
                   (zip/edit loc (fn [{::keys [x y] :as node}]
                                   (assoc node
                                          ::ax (or x 0)
