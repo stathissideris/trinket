@@ -64,9 +64,10 @@
 
 (defn- config-component [ui data path {::keys [idx last-idx cursor]}]
   (cond-> ui
-    :always (assoc ::path path
-                   ::index idx
-                   ::tag (collection-tag data))
+    :always (merge {::path       path
+                    ::click-path path
+                    ::index      idx
+                    ::tag        (collection-tag data)})
     (and idx (zero? idx)) (assoc ::first true)
     (and idx (= idx last-idx)) (assoc ::last true)))
 
@@ -101,7 +102,7 @@
           [(-> (annotation (str "TABLE"
                                 (when-not (lazy? data)
                                   (str " (" (count data) " ROWS, " (count total-keys) " COLUMNS)"))))
-               (assoc ::path path))
+               (assoc ::path path ::click-path path))
            (when aliases (aliases-panel aliases))
            (ui/grid
             {::ui/column-padding 5
@@ -212,7 +213,8 @@
        {::tag         (collection-tag data)
         ::path        path
         ::ui/children
-        [(when prefixed (ui/text (str "#:" (namespace (ffirst data)))))
+        [(when prefixed (ui/text {::ui/text    (str "#:" (namespace (ffirst data)))
+                                  ::click-path path}))
          (ui/grid
           {::ui/columns  5
            ::ui/children
@@ -369,7 +371,8 @@
                     {::ui/x (.getX e) ::ui/y (.getY e)}
                     (ui/scale @ui-atom (::scale @options-atom)))] ;;scale so that clicks land correctly ;;TODO OPTIMIZE!!!
     (condp = (.getClickCount e)
-      1 (swap-options! inspector assoc ::cursor (::click-path match))
+      1 (when-let [cp (::click-path match)]
+          (swap-options! inspector assoc ::cursor cp))
       2 (when-not (= :atom (::tag match))
           (toggle-expansion! inspector (::click-path match)))
       nil)))
