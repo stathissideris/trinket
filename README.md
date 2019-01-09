@@ -30,6 +30,7 @@ Clojure data inspector
 - [x] BUG: white background when zooming out
 - [ ] Table view navigation
 - [ ] Customisable keys
+- [ ] Customisable themes
 - [ ] Move drop/take code for paging lazy sequences out of drawing
       code and into the event loop. This will allow us to constrain
       scrolling to not go beyond the end of the sequence. Also,
@@ -51,8 +52,22 @@ Clojure data inspector
 - [ ] barchart
 - [ ] show aliases on mixed single maps
 - [ ] turn aliases on and off
-- [ ] BUG: broken scrolling in lazy data structures
+- [x] BUG: broken scrolling in lazy data structures
 - [x] BUG: keywords can be "expanded"
+
+## REPL workflows
+
+- Highlight something and press `d` to def it and then use it in the
+  REPL.
+
+- "mark" elements of the current seq according to whether they match a
+  predicate or not. Implicit arguments are the inspector (default is
+  the last one opened) and the path to mark, but you should be given
+  the option to pass them.
+
+- show/hide columns of tables
+
+- use highlighted thing as implicit argument to your own function
 
 ## How to address both keys and values in nested data structures
 
