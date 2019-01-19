@@ -200,7 +200,8 @@
 (defn- prefixed-map?
   "Checks whether the map's keys are uniformly namespaced keywords"
   [m]
-  (and (every? keyword? (keys m))
+  (and (not (empty? m))
+       (every? keyword? (keys m))
        (not (nil? (namespace (ffirst m))))
        (apply = (map namespace (keys m)))))
 
