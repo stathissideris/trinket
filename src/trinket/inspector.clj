@@ -148,9 +148,11 @@
                      (ui/text (or indent-str " ")))
 
                    ;;value
-                   (let [value-ui (let [options (-> options
-                                                    (dissoc ::suppress-indexes) ;;suppress-indexes is for one-level only
-                                                    (assoc ::idx idx ::last-idx last-idx))]
+                   (let [value-ui (let [options (merge (-> options (dissoc ::suppress-indexes ::idx ::last-idx
+                                                                           ::first ::last)) ;; suppress-indexes is for one-level only
+                                                       {::idx idx ::last-idx last-idx}
+                                                       (when (zero? idx) {::first true})
+                                                       (when (= idx last-idx) {::last true}))]
                                     (if (get expanded value-path)
                                       (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
                                       (data->ui v value-path options)))]
@@ -214,41 +216,43 @@
     (let [last-idx (dec (count data))
           prefixed  (prefixed-map? data)]
       (ui/vertical
-       {::tag         (collection-tag data)
-        ::path        path
-        ::ui/children
-        [(when prefixed (ui/text {::ui/text    (str "#:" (namespace (ffirst data)))
-                                  ::click-path path}))
-         (ui/grid
-          {::ui/columns  5
-           ::ui/children
-           (vec
-            (apply concat
-                   (for [[idx [k v]] (map-indexed vector data)]
-                     (let [key-path (conj path idx ::path/key)
-                           val-path (conj path idx ::path/val)]
-                       [ ;;opening
-                        (if (zero? idx)
-                          (-> (ui/text "{") (assoc ::click-path path)) ;;assoc path to allow mouse selection of whole map
-                          (ui/text " "))
+       (merge
+        options
+        {::tag         (collection-tag data)
+         ::path        path
+         ::ui/children
+         [(when prefixed (ui/text {::ui/text    (str "#:" (namespace (ffirst data)))
+                                   ::click-path path}))
+          (ui/grid
+           {::ui/columns  5
+            ::ui/children
+            (vec
+             (apply concat
+                    (for [[idx [k v]] (map-indexed vector data)]
+                      (let [key-path (conj path idx ::path/key)
+                            val-path (conj path idx ::path/val)]
+                        [ ;;opening
+                         (if (zero? idx)
+                           (-> (ui/text "{") (assoc ::click-path path)) ;;assoc path to allow mouse selection of whole map
+                           (ui/text " "))
 
-                        ;;key
-                        (if (get expanded key-path)
-                          (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
-                          (let [k-text (if prefixed
-                                         (str ":" (name k))
-                                         (pr-str k))]
-                            (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx))))
+                         ;;key
+                         (if (get expanded key-path)
+                           (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
+                           (let [k-text (if prefixed
+                                          (str ":" (name k))
+                                          (pr-str k))]
+                             (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx))))
 
-                        (ui/text " ")
+                         (ui/text " ")
 
-                        ;;value
-                        (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
+                         ;;value
+                         (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
 
-                        ;; closing
-                        (if (= idx last-idx)
-                          (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw"))
-                          (ui/text " "))]))))})]}))))
+                         ;; closing
+                         (if (= idx last-idx)
+                           (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw"))
+                           (ui/text " "))]))))})]})))))
 
 (defn paint-cursor [ui path ^Graphics2D g]
   (when-let [match (ui/find-component ui #(= path (::path %)))]
@@ -362,8 +366,8 @@
       ;;(and (= :right direction) (not (::last (ui/find-component ui ::cursor))))
       ;;(swap-options! inspector update ::cursor path/last)
 
-      ;; right or down to go into structure
-      (#{:right :down} direction)
+      ;; right to go into structure
+      (= :right direction)
       (let [tag (::tag cur-comp)]
         (dbg "right or down to go into structure")
         (when (and (not= tag :atom) (expanded? inspector cur))
@@ -412,6 +416,12 @@
   (swap-options! inspector update-in [::lengths path]
                  (fn [x]
                    (inc (or x page-length)))))
+
+(defn- focused [{:keys [ui-atom] :as inspector}]
+  (let [ui  @ui-atom
+        cur (cursor inspector)]
+    (ui/find-component ui #(= cur (::path %)))))
+
 
 (defn- key-pressed [{:keys [data-atom ui-atom options-atom] :as inspector} ^KeyEvent e]
   (let [cur       (cursor inspector)
@@ -584,7 +594,7 @@
                :as  "well!"} "yay!"
               :ccccc         "This is a test"}))
 
-  (def the-data
+  (inspect
     ["foo"
      (concat
       [{:name "Stathis" :surname "Sideris" :activity "coding"}
@@ -690,4 +700,6 @@
       (clojure.pprint/pprint))
 
   (def ins (inspect (clojure.edn/read-string (slurp "/Users/sideris/devel/work/gt/gt-ingest/ingest-service/test-resources/CH2PRSKNT100000012954708-coerced.edn"))))
+
+  (def ins (inspect (clojure.edn/read-string (slurp "/Volumes/work/bsq/data/reports/sonyeu_aa_retailers_eu/2017-06-06/s2314_58bd822ee4b00170c3aa95ef.edn"))))
   )

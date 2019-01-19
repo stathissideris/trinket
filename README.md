@@ -57,7 +57,7 @@ Clojure data inspector
 - [x] BUG: keywords can be "expanded"
 - [ ] BUG: Top-level empty maps render as invisible
 - [ ] BUG: Can't expand `{:a (range 100)}`
-- [ ] BUG: Can't go left from an expanded map, up to a lazy seq
+- [x] BUG: Can't go left from an expanded map, up to a lazy seq
 
 ## REPL workflows
 
