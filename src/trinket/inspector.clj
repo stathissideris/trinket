@@ -264,7 +264,10 @@
       (.setContents (StringSelection. s) nil))
   s)
 
-(defn- set-data!
+(defn set-data!
+  "Sets the data of an inspector. With single arity, it sets the data of
+  the last opened inspector. Caution: If you are inspecting an atom,
+  this function will mutate your atom."
   ([data]
    (set-data! nil data))
   ([inspector data]
