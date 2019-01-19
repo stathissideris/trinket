@@ -104,28 +104,23 @@
 (defrecord Text []
   Component
   (paint! [{::keys [text ax ay w h selected font size color underline] :as this} g]
-    (when-not (perf/acc :clip-check (fully-outside-clip? ax ay w h (.getClipBounds ^Graphics2D g)))
-      (perf/acc
-       :prepare-label
-       (do
-         (if underline
-           (.setText text-stamp (str "<html><u>" text "</u></html>"))
-           (.setText text-stamp text))
-         (if selected
-           (doto text-stamp
-             (.setOpaque true)
-             (.setBackground color-selection-background))
-           (doto text-stamp
-             (.setOpaque false)))
-         (-> text-stamp (.setFont (or font font-mono)))
-         (when size
-           (.setFont text-stamp (-> text-stamp .getFont (derive-font size))))
-         (if color
-           (.setForeground text-stamp color)
-           (.setForeground text-stamp color-text))))
-      (perf/acc
-       :paint-at
-       (paint-at! text-stamp g this))))
+    (when-not (fully-outside-clip? ax ay w h (.getClipBounds ^Graphics2D g))
+      (if underline
+        (.setText text-stamp (str "<html><u>" text "</u></html>"))
+        (.setText text-stamp text))
+      (if selected
+        (doto text-stamp
+          (.setOpaque true)
+          (.setBackground color-selection-background))
+        (doto text-stamp
+          (.setOpaque false)))
+      (-> text-stamp (.setFont (or font font-mono)))
+      (when size
+        (.setFont text-stamp (-> text-stamp .getFont (derive-font size))))
+      (if color
+        (.setForeground text-stamp color)
+        (.setForeground text-stamp color-text))
+      (paint-at! text-stamp g this)))
   (ideal-size [this]
     {::w (* 7 (.length (::text this)))
      ::h 15})
