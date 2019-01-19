@@ -546,6 +546,7 @@
        (.setBorder (BorderFactory/createEmptyBorder))
        (.addMouseListener (mouse-listener inspector)))
      (doto frame
+       (.setFocusTraversalKeysEnabled false) ;; so that <TAB> can be detected
        (.addKeyListener (key-listener inspector))
        (.setVisible true))
 

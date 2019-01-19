@@ -12,6 +12,7 @@ Clojure data inspector
 - You can select things at any level
 - Better keyboard support
 - You can navigate data structures used as keys
+- def the highlighted data for further processing in the REPL.
 
 ## TODO
 
@@ -54,6 +55,8 @@ Clojure data inspector
 - [ ] turn aliases on and off
 - [x] BUG: broken scrolling in lazy data structures
 - [x] BUG: keywords can be "expanded"
+- [ ] BUG: Top-level empty maps render as invisible
+- [ ] BUG: Can't expand `{:a (range 100)}`
 
 ## REPL workflows
 
