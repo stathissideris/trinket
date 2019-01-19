@@ -482,13 +482,16 @@
        (= (dissoc old k)
           (dissoc new k))))
 
+(defn- atom? [x]
+  (instance? clojure.lang.Atom x)) ;;TODO make this more generic
+
 (defn inspect
   ([data]
    (inspect data {}))
   ([data options]
-   (let [data-atom       (atom data)
+   (let [data-atom       (if (atom? data) data (atom data))
          options-atom    (atom (merge default-options options))
-         ui-atom         (atom (make-new-ui data @options-atom))
+         ui-atom         (atom (make-new-ui @data-atom @options-atom))
          sp              (atom nil)
          ^JPanel panel   (proxy [JPanel] []
                            (paintComponent [^Graphics2D g]
