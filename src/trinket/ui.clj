@@ -1,6 +1,7 @@
 (ns trinket.ui
   (:require [clojure.zip :as zip]
-            [trinket.perf :as perf])
+            ;;[trinket.perf :as perf]
+            )
   (:import [java.awt Graphics2D Color Font Rectangle]
            [javax.swing SwingUtilities JComponent JLabel]))
 
@@ -139,8 +140,6 @@
         :else
         (assoc (->Text) ::text (str x))))
 
-(defn- transpose [rows]
-  (apply map vector rows))
 
 (defn safe-max [coll]
   (if (empty? coll)
@@ -178,7 +177,7 @@
 (defrecord Grid []
   Component
   (paint! [{::keys [children] :as this} g]
-    (perf/acc :child-iterate (doseq [child children] (paint! child g))))
+    (doseq [child children] (paint! child g)))
   (ideal-size [this]
     (layout this))
   (layout [{::keys [children columns column-padding]

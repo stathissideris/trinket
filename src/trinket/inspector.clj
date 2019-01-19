@@ -3,7 +3,8 @@
             [trinket.ui :as ui]
             [trinket.path :as path]
             [trinket.alias :as alias]
-            [trinket.perf :as perf]
+            ;;[trinket.perf :as perf]
+            [trinket.util :refer [cfuture]]
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
@@ -99,7 +100,8 @@
         nss        (distinct (remove nil? (map namespace total-keys)))
         aliases    (alias/make-aliases nss)]
     (-> (ui/vertical
-         {::ui/children
+         {::display     ::table
+          ::ui/children
           [(-> (annotation (str "TABLE"
                                 (when-not (lazy? data)
                                   (str " (" (count data) " ROWS, " (count total-keys) " COLUMNS)"))))
@@ -492,25 +494,28 @@
          sp              (atom nil)
          ^JPanel panel   (proxy [JPanel] []
                            (paintComponent [^Graphics2D g]
-                             (let [ui              @ui-atom
-                                   scale           (::scale @options-atom)
-                                   f               scale
-                                   ^JScrollPane sp @sp
-                                   scroll-pos      (-> sp .getViewport .getViewPosition)
-                                   sx              (.-x scroll-pos)
-                                   sy              (.-y scroll-pos)
-                                   view-size       (-> sp .getViewport .getViewSize)
-                                   vw              (.-width view-size)
-                                   vh              (.-height view-size)]
-                               (doto g
-                                 (.setClip (- sx 2) (- sy 2) (+ 10 vw) (+ 10 vh))
-                                 (.scale f f)
-                                 (.setColor ui/color-background)
-                                 (.fillRect -2 -2
-                                            (* (/ 1.0 scale) (+ 10 (.getWidth ^JPanel this)))
-                                            (* (/ 1.0 scale) (+ 10 (.getHeight ^JPanel this)))))
-                               (#'paint-cursor ui (::cursor @options-atom) g)
-                               (ui/paint! ui g))))
+                             (try
+                               (let [ui              @ui-atom
+                                     scale           (::scale @options-atom)
+                                     f               scale
+                                     ^JScrollPane sp @sp
+                                     scroll-pos      (-> sp .getViewport .getViewPosition)
+                                     sx              (.-x scroll-pos)
+                                     sy              (.-y scroll-pos)
+                                     view-size       (-> sp .getViewport .getViewSize)
+                                     vw              (.-width view-size)
+                                     vh              (.-height view-size)]
+                                 (doto g
+                                   (.setClip (- sx 2) (- sy 2) (+ 10 vw) (+ 10 vh))
+                                   (.scale f f)
+                                   (.setColor ui/color-background)
+                                   (.fillRect -2 -2
+                                              (* (/ 1.0 scale) (+ 10 (.getWidth ^JPanel this)))
+                                              (* (/ 1.0 scale) (+ 10 (.getHeight ^JPanel this)))))
+                                 (#'paint-cursor ui (::cursor @options-atom) g)
+                                 (ui/paint! ui g))
+                               (catch Exception e
+                                 (.printStackTrace e)))))
          ^JScrollPane sp (reset! sp (doto (JScrollPane. panel)
                                       ((fn [sp]
                                          (.setUnitIncrement (.getVerticalScrollBar ^JScrollPane sp) 16)
@@ -524,14 +529,14 @@
      (add-watch data-atom ::inspector-ui
                 (fn [_ _ _ data]
                   (let [{::keys [scale] :as options} @options-atom]
-                    (future
+                    (cfuture
                       (let [new-ui (make-new-ui data options)]
                         (reset! ui-atom new-ui)
                         (ui/later (trigger-repaint new-ui scale panel frame)))))))
 
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ old-options {::keys [scale] :as options}]
-                  (future
+                  (cfuture
                     (if (only-diff? old-options options ::cursor)
                       (ui/later (trigger-repaint @ui-atom scale panel frame))
                       (let [new-ui (make-new-ui @data-atom options)]
