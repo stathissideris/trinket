@@ -415,9 +415,7 @@
                       (toggle-expansion! inspector (cursor inspector))))]
     (condp = (.getKeyCode e)
       KeyEvent/VK_TAB    (expand-fn)
-      KeyEvent/VK_ENTER  (if (.isShiftDown e)
-                           (move-cursor! inspector :in)
-                           (expand-fn))
+      KeyEvent/VK_ENTER  (move-cursor! inspector :in)
 
       KeyEvent/VK_T      (swap-options! inspector update ::tables
                                         (fn [tables]
@@ -431,11 +429,7 @@
       KeyEvent/VK_PERIOD (scroll-seq! inspector (cursor inspector) safe-inc)
 
       KeyEvent/VK_LEFT   (move-cursor! inspector :left)
-      KeyEvent/VK_RIGHT  (let [ui @ui-atom]
-                           (if (and (not (expanded? inspector (cursor inspector)))
-                                    (not= :atom (::tag (ui/find-component @ui-atom #(= cur (::path %))))))
-                             (expand! inspector (cursor inspector))
-                             (move-cursor! inspector :right)))
+      KeyEvent/VK_RIGHT  (move-cursor! inspector :right)
       KeyEvent/VK_UP     (move-cursor! inspector :up)
       KeyEvent/VK_DOWN   (move-cursor! inspector :down)
 
