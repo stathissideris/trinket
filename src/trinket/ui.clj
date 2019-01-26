@@ -198,6 +198,7 @@
   (layout [{::keys [children column-padding]
             :or    {column-padding 0}
             :as    this}]
+    (assert (every? (partial instance? trinket.ui.Row) children))
     (let [rows          (mapv layout children)
           this          (assoc this ::children rows)
           col-count     (safe-max (map (comp count ::children) rows))
@@ -209,7 +210,7 @@
                               (range col-count))
           total-width   (reduce + column-widths)
           x-positions   (vec (reductions + 0 column-widths))
-          row-heights   (map row-height rows)
+          row-heights   (mapv row-height rows)
           y-positions   (vec (reductions + 0 row-heights))]
 
       (as-> this $
@@ -219,16 +220,6 @@
 
         ;;position the cells
         (map-grid (fn [r c child]
-                    (prn '- child)
-                    (prn '==>
-                         (when child
-                           (let [x (get x-positions c)
-                                 y (get y-positions r)
-                                 w (get column-widths c)
-                                 h (get row-heights r)]
-                             (merge child
-                                    (position-in-rect child {::x x ::y y ::w w ::h h})))))
-                    (prn)
                     (when child
                       (let [x (get x-positions c)
                             y (get y-positions r)
