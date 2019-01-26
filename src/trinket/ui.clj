@@ -157,12 +157,19 @@
     "ne" {::x (- (+ rx rw) cw) ::y ry}
     "se" {::x (- (+ rx rw) cw) ::y (- (+ ry rh) ch)}))
 
+;; Row doesn't do anything intelligent with layout, it just Components
+;; together and delegates painting and layout to children. It's only
+;; meant to be used within the context of a Grid.
 (defrecord Row []
   Component
   (paint! [{::keys [children] :as this} g]
     (doseq [child children] (paint! child g)))
   (layout [{::keys [children] :as this}]
     (update this ::children (partial mapv layout))))
+
+(defn row [options]
+  (map->Row
+   (merge {::layout "row"} options)))
 
 (defn- nth-child [c n]
   (-> c ::children (get n)))
@@ -171,7 +178,7 @@
   (->> row ::children (map #(get % ::h 0)) safe-max))
 
 (defn- map-idx-children [fun c]
-  (update c ::children #(map fun (range) %)))
+  (update c ::children #(mapv fun (range) %)))
 
 (defn- map-grid [fun g]
   (->> g
@@ -192,6 +199,7 @@
             :or    {column-padding 0}
             :as    this}]
     (let [rows          (mapv layout children)
+          this          (assoc this ::children rows)
           col-count     (safe-max (map (comp count ::children) rows))
           row-count     (count rows)
           column-widths (mapv (fn [col]
@@ -199,6 +207,7 @@
                                      (map #(-> % (nth-child col) (get ::w 0)))
                                      safe-max))
                               (range col-count))
+          total-width   (reduce + column-widths)
           x-positions   (vec (reductions + 0 column-widths))
           row-heights   (map row-height rows)
           y-positions   (vec (reductions + 0 row-heights))]
@@ -207,7 +216,19 @@
         (assoc $
                ::w (apply + column-widths)
                ::h (apply + row-heights))
+
+        ;;position the cells
         (map-grid (fn [r c child]
+                    (prn '- child)
+                    (prn '==>
+                         (when child
+                           (let [x (get x-positions c)
+                                 y (get y-positions r)
+                                 w (get column-widths c)
+                                 h (get row-heights r)]
+                             (merge child
+                                    (position-in-rect child {::x x ::y y ::w w ::h h})))))
+                    (prn)
                     (when child
                       (let [x (get x-positions c)
                             y (get y-positions r)
@@ -215,7 +236,17 @@
                             h (get row-heights r)]
                         (merge child
                                (position-in-rect child {::x x ::y y ::w w ::h h})))))
-                  $)))))
+                  $)
+
+        ;;position the rows
+        (map-idx-children
+         (fn [idx row]
+           (assoc row
+                  ::x 0
+                  ::y (get y-positions idx 0)
+                  ::w total-width
+                  ::h (get row-heights idx 0)))
+         $)))))
 
 (defn grid [options]
   (map->Grid
@@ -225,13 +256,13 @@
   (map->Grid
    (merge options
           {::layout  "horizontal"
-           ::children })))
+           ::children [(row {::children children})]})))
 
-(defn vertical [options]
+(defn vertical [{::keys [children] :as options}]
   (map->Grid
-   (merge {::columns 1
-           ::layout "vertical"}
-          options)))
+   (merge options
+          {::layout "vertical"
+           ::children (mapv #(row {::children [%]}) children)})))
 
 (defn grow-bounds [{::keys [ax ay w h]} d]
   {::ax (- ax d)

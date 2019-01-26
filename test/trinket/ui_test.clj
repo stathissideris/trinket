@@ -25,36 +25,36 @@
   (testing "horizontal layout"
     (is
      (= #trinket.ui.Grid
-        {::ui/x        10
-         ::ui/y        10
-         ::ui/w        60
-         ::ui/h        10
-         ::ui/ax       10
-         ::ui/ay       10
-         ::ui/columns 3
-         ::ui/layout "horizontal"
-         ::ui/children
-         [#trinket.ui_test.EasyText{::ui/text "aa"
-                                    ::ui/x    0
-                                    ::ui/y    0
-                                    ::ui/w    20
-                                    ::ui/h    10
-                                    ::ui/ax   10
-                                    ::ui/ay   10}
-          #trinket.ui_test.EasyText{::ui/text "bb"
-                                    ::ui/x    20
-                                    ::ui/y    0
-                                    ::ui/w    20
-                                    ::ui/h    10
-                                    ::ui/ax   30
-                                    ::ui/ay   10}
-          #trinket.ui_test.EasyText{::ui/text "cc"
-                                    ::ui/x    40
-                                    ::ui/y    0
-                                    ::ui/w    20
-                                    ::ui/h    10
-                                    ::ui/ax   50
-                                    ::ui/ay   10}]}
+        {:trinket.ui/x        10
+         :trinket.ui/y        10
+         :trinket.ui/children
+         [#trinket.ui.Row{:trinket.ui/layout   "row"
+                          :trinket.ui/children
+                          [#trinket.ui_test.EasyText{:trinket.ui/text "aa"
+                                                     :trinket.ui/x    0
+                                                     :trinket.ui/y    0
+                                                     :trinket.ui/ax   10
+                                                     :trinket.ui/ay   10}
+                           #trinket.ui_test.EasyText{:trinket.ui/text "bb"
+                                                     :trinket.ui/x    20
+                                                     :trinket.ui/y    0
+                                                     :trinket.ui/ax   30
+                                                     :trinket.ui/ay   10}
+                           #trinket.ui_test.EasyText{:trinket.ui/text "cc"
+                                                     :trinket.ui/x    40
+                                                     :trinket.ui/y    0
+                                                     :trinket.ui/ax   50
+                                                     :trinket.ui/ay   10}]
+                          :trinket.ui/x        0
+                          :trinket.ui/y        0
+                          :trinket.ui/ax       10
+                          :trinket.ui/ay       10}]
+         :trinket.ui/layout   "horizontal"
+         :trinket.ui/w        60
+         :trinket.ui/h        10
+         :trinket.ui/ax       10
+         :trinket.ui/ay       10}
+
         (ui/add-absolute-coords
          (ui/layout
           (ui/horizontal
@@ -68,36 +68,47 @@
   (testing "vertical layout"
     (is
      (= #trinket.ui.Grid
-        {::ui/x        10
-         ::ui/y        10
-         ::ui/w        40
-         ::ui/h        30
-         ::ui/ax       10
-         ::ui/ay       10
-         ::ui/columns  1
-         ::ui/layout   "vertical"
-         ::ui/children
-         [#trinket.ui_test.EasyText{::ui/text "aaa"
-                                    ::ui/x    0
-                                    ::ui/y    0
-                                    ::ui/w    30
-                                    ::ui/h    10
-                                    ::ui/ax   10
-                                    ::ui/ay   10}
-          #trinket.ui_test.EasyText{::ui/text "bb"
-                                    ::ui/x    0
-                                    ::ui/y    10
-                                    ::ui/w    20
-                                    ::ui/h    10
-                                    ::ui/ax   10
-                                    ::ui/ay   20}
-          #trinket.ui_test.EasyText{::ui/text "cccc"
-                                    ::ui/x    0
-                                    ::ui/y    20
-                                    ::ui/w    40
-                                    ::ui/h    10
-                                    ::ui/ax   10
-                                    ::ui/ay   30}]}
+        {:trinket.ui/x        10
+         :trinket.ui/y        10
+         :trinket.ui/layout   "vertical"
+         :trinket.ui/w        40
+         :trinket.ui/h        30
+         :trinket.ui/ax       10
+         :trinket.ui/ay       10
+         :trinket.ui/children
+         [#trinket.ui.Row{:trinket.ui/layout   "row"
+                          :trinket.ui/x        0
+                          :trinket.ui/y        0
+                          :trinket.ui/ax       10
+                          :trinket.ui/ay       10
+                          :trinket.ui/children
+                          [#trinket.ui_test.EasyText{:trinket.ui/text "aaa"
+                                                     :trinket.ui/x    0
+                                                     :trinket.ui/y    0
+                                                     :trinket.ui/ax   10
+                                                     :trinket.ui/ay   10}]}
+          #trinket.ui.Row{:trinket.ui/layout   "row"
+                          :trinket.ui/x        0
+                          :trinket.ui/y        10
+                          :trinket.ui/ax       10
+                          :trinket.ui/ay       20
+                          :trinket.ui/children
+                          (#trinket.ui_test.EasyText{:trinket.ui/text "bb"
+                                                     :trinket.ui/x    0
+                                                     :trinket.ui/y    10
+                                                     :trinket.ui/ax   10
+                                                     :trinket.ui/ay   30})}
+          #trinket.ui.Row{:trinket.ui/layout   "row"
+                          :trinket.ui/x        0
+                          :trinket.ui/y        20
+                          :trinket.ui/ax       10
+                          :trinket.ui/ay       30
+                          :trinket.ui/children
+                          [#trinket.ui_test.EasyText{:trinket.ui/text "cccc"
+                                                     :trinket.ui/x    0
+                                                     :trinket.ui/y    20
+                                                     :trinket.ui/ax   10
+                                                     :trinket.ui/ay   50}]}]}
         (ui/add-absolute-coords
          (ui/layout
           (ui/vertical

@@ -108,18 +108,18 @@
                (assoc ::path path ::click-path path))
            (when aliases (aliases-panel aliases))
            (ui/grid
-            {::ui/column-padding 5
-             ::ui/columns        (inc (count total-keys))
+            {::ui/columns  (inc (count total-keys))
              ::ui/children
-             (vec
-              (concat [nil] (map #(atom->ui %
-                                            nil
-                                            (assoc options
-                                                   ::underline true
-                                                   ::text (alias/shorten % aliases))) total-keys)
-                      (mapcat (fn [idx row]
-                                (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys)))
-                              (range) data)))})]})
+             (concat
+              [(ui/row {::ui/children (into [nil] (map #(atom->ui %
+                                                                   nil
+                                                                   (assoc options
+                                                                          ::underline true
+                                                                          ::text (alias/shorten % aliases))) total-keys))})]
+              (map (fn [idx row]
+                     (ui/row
+                      {::ui/children (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys))}))
+                   (range) data))})]})
         (config-component data path options))))
 
 (defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx offset
@@ -224,35 +224,34 @@
          [(when prefixed (ui/text {::ui/text    (str "#:" (namespace (ffirst data)))
                                    ::click-path path}))
           (ui/grid
-           {::ui/columns  5
-            ::ui/children
-            (vec
-             (apply concat
-                    (for [[idx [k v]] (map-indexed vector data)]
-                      (let [key-path (conj path idx ::path/key)
-                            val-path (conj path idx ::path/val)]
-                        [ ;;opening
-                         (if (zero? idx)
-                           (-> (ui/text "{") (assoc ::click-path path)) ;;assoc path to allow mouse selection of whole map
-                           (ui/text " "))
+           {::ui/children
+            (for [[idx [k v]] (map-indexed vector data)]
+              (let [key-path (conj path idx ::path/key)
+                    val-path (conj path idx ::path/val)]
+                (ui/row
+                 {::ui/children
+                  [ ;;opening
+                   (if (zero? idx)
+                     (-> (ui/text "{") (assoc ::click-path path)) ;;assoc path to allow mouse selection of whole map
+                     (ui/text " "))
 
-                         ;;key
-                         (if (get expanded key-path)
-                           (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
-                           (let [k-text (if prefixed
-                                          (str ":" (name k))
-                                          (pr-str k))]
-                             (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx))))
+                   ;;key
+                   (if (get expanded key-path)
+                     (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
+                     (let [k-text (if prefixed
+                                    (str ":" (name k))
+                                    (pr-str k))]
+                       (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx))))
 
-                         (ui/text " ")
+                   (ui/text " ")
 
-                         ;;value
-                         (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
+                   ;;value
+                   (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
 
-                         ;; closing
-                         (if (= idx last-idx)
-                           (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw"))
-                           (ui/text " "))]))))})]})))))
+                   ;; closing
+                   (if (= idx last-idx)
+                     (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw"))
+                     (ui/text " "))]})))})]})))))
 
 (defn paint-cursor [ui path ^Graphics2D g]
   (when-let [match (ui/find-component ui #(= path (::path %)))]
