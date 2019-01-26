@@ -157,17 +157,30 @@
     "ne" {::x (- (+ rx rw) cw) ::y ry}
     "se" {::x (- (+ rx rw) cw) ::y (- (+ ry rh) ch)}))
 
-(defn- map-grid [rows columns fun v]
-  (let [vv (transient v)]
-    (loop [r 0]
-      (when-not (= r rows)
-        (loop [c 0]
-          (when-not (= c columns)
-            (let [idx (+ (* r columns) c)]
-              (assoc! vv idx (fun r c (get vv idx))))
-            (recur (inc c))))
-        (recur (inc r))))
-    (persistent! vv)))
+(defrecord Row []
+  Component
+  (paint! [{::keys [children] :as this} g]
+    (doseq [child children] (paint! child g)))
+  (layout [{::keys [children] :as this}]
+    (update this ::children (partial mapv layout))))
+
+(defn- nth-child [c n]
+  (-> c ::children (get n)))
+
+(defn- row-height [row]
+  (->> row ::children (map #(get % ::h 0)) safe-max))
+
+(defn- map-idx-children [fun c]
+  (update c ::children #(map fun (range) %)))
+
+(defn- map-grid [fun g]
+  (->> g
+       (map-idx-children
+        (fn [row-idx row]
+          (->> row
+               (map-idx-children
+                (fn [col-idx cell]
+                  (fun row-idx col-idx cell))))))))
 
 (defrecord Grid []
   Component
@@ -175,41 +188,34 @@
     (doseq [child children] (paint! child g)))
   (ideal-size [this]
     (layout this))
-  (layout [{::keys [children columns column-padding]
+  (layout [{::keys [children column-padding]
             :or    {column-padding 0}
             :as    this}]
-    (let [laid-out      (mapv #(when % (layout %)) children)
-          row-count     (int (Math/ceil (/ (count children) columns)))
-          column-widths (vec
-                         (for [c (range columns)]
-                           (safe-max
-                            (for [r (range row-count)]
-                              (-> laid-out (nth (+ (* r columns) c)) (get ::w 0) (+ column-padding))))))
-
+    (let [rows          (mapv layout children)
+          col-count     (safe-max (map (comp count ::children) rows))
+          row-count     (count rows)
+          column-widths (mapv (fn [col]
+                                (->> rows
+                                     (map #(-> % (nth-child col) (get ::w 0)))
+                                     safe-max))
+                              (range col-count))
           x-positions   (vec (reductions + 0 column-widths))
-
-          row-heights   (vec
-                         (for [r (range row-count)]
-                           (safe-max
-                            (for [c (range columns)]
-                              (-> laid-out (nth (+ (* r columns) c)) (get ::h 0))))))
+          row-heights   (map row-height rows)
           y-positions   (vec (reductions + 0 row-heights))]
 
-      (assoc this
-             ::w (apply + column-widths)
-             ::h (apply + row-heights)
-             ::children
-             (map-grid row-count
-                       columns
-                       (fn [r c child]
-                         (when child
-                           (let [x (get x-positions c)
-                                 y (get y-positions r)
-                                 w (get column-widths c)
-                                 h (get row-heights r)]
-                             (merge child
-                                    (position-in-rect child {::x x ::y y ::w w ::h h})))))
-                       laid-out)))))
+      (as-> this $
+        (assoc $
+               ::w (apply + column-widths)
+               ::h (apply + row-heights))
+        (map-grid (fn [r c child]
+                    (when child
+                      (let [x (get x-positions c)
+                            y (get y-positions r)
+                            w (get column-widths c)
+                            h (get row-heights r)]
+                        (merge child
+                               (position-in-rect child {::x x ::y y ::w w ::h h})))))
+                  $)))))
 
 (defn grid [options]
   (map->Grid
@@ -217,9 +223,9 @@
 
 (defn horizontal [{::keys [children] :as options}]
   (map->Grid
-   (merge {::columns (count children)
-           ::layout  "horizontal"}
-          options)))
+   (merge options
+          {::layout  "horizontal"
+           ::children })))
 
 (defn vertical [options]
   (map->Grid
