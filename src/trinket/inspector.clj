@@ -77,11 +77,13 @@
   (let [color (cond (keyword? data) ui/color-keywords
                     (string? data)  ui/color-strings
                     :else           ui/color-text)]
-    (-> (ui/text {::ui/text      (if text text
-                                     (binding [*print-length* page-length]
-                                       (pr-str data)))
-                  ::ui/color     color
-                  ::ui/underline underline})
+    (-> (ui/text (merge
+                  options
+                  {::ui/text      (if text text
+                                      (binding [*print-length* page-length]
+                                        (pr-str data)))
+                   ::ui/color     color
+                   ::ui/underline underline}))
         (config-component data path options))))
 
 (defn- aliases-panel [aliases]
@@ -122,7 +124,12 @@
                        (when (zero? idx) {::first true})
                        (when (= idx (-> data count dec)) {::last true})
                        {::path        (conj path idx)
-                        ::ui/children (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil (assoc options ::cell true)) total-keys))})))
+                        ::table-row   true
+                        ::ui/children (cons (-> (annotation (+ offset idx))
+                                                (assoc ::click-path (conj path idx)))
+                                            (map-indexed (fn [col-idx k]
+                                                           (atom->ui (get row k) (conj path idx col-idx) (assoc options ::cell true)))
+                                                         total-keys))})))
                    (range) data))})]})
         (config-component data path options))))
 
@@ -320,10 +327,23 @@
         cur      (cursor inspector)
         cur-comp (ui/find-component ui #(= cur (::path %)))]
     (cond
+      ;;TABLE navigation
+      (and (= :right direction) (::cell cur-comp))
+      (swap-options! inspector update ::cursor path/right)
+
+      (and (= :left direction) (::cell cur-comp))
+      (swap-options! inspector update ::cursor path/left)
+
+      (and (= :down direction) (::cell cur-comp))
+      (swap-options! inspector update ::cursor path/next-row)
+
+      (and (= :up direction) (::cell cur-comp))
+      (swap-options! inspector update ::cursor path/previous-row)
+
       ;; going in!
       (= :in direction)
       (let [tag (::tag cur-comp)]
-        (when (and (not= tag :atom) (expanded? inspector cur))
+        (when (and (not= tag :atom) (or (expanded? inspector cur) (::table-row cur-comp)))
           (if (= tag :map)
             (swap-options! inspector update ::cursor conj 0 ::path/key)
             (swap-options! inspector update ::cursor conj 0))))

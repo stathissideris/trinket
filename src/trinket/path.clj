@@ -31,6 +31,18 @@
         (update path (dec last-nth) inc)
         (update path last-nth inc)))))
 
+(defn next-row [path]
+  (if (empty? path)
+    path
+    (let [[row col] (take-last 2 path)]
+      (vec (concat (drop-last 2 path) [(inc row) col])))))
+
+(defn previous-row [path]
+  (if (empty? path)
+    path
+    (let [[row col] (take-last 2 path)]
+      (vec (concat (drop-last 2 path) [(dec row) col])))))
+
 (defn first [path]
   (if (empty? path)
     path
