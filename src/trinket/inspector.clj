@@ -113,11 +113,14 @@
             {::ui/columns  (inc (count total-keys))
              ::ui/children
              (concat
+              ;;header
               [(ui/row {::ui/children (into [nil] (map #(atom->ui %
                                                                   nil
                                                                   (assoc options
                                                                          ::underline true
                                                                          ::text (alias/shorten % aliases))) total-keys))})]
+
+              ;;data
               (map (fn [idx row]
                      (ui/row
                       (merge
@@ -128,7 +131,7 @@
                         ::ui/children (cons (-> (annotation (+ offset idx))
                                                 (assoc ::click-path (conj path idx)))
                                             (map-indexed (fn [col-idx k]
-                                                           (atom->ui (get row k) (conj path idx col-idx) (assoc options ::cell true)))
+                                                           (data->ui (get row k) (conj path idx col-idx) (assoc options ::cell true)))
                                                          total-keys))})))
                    (range) data))})]})
         (config-component data path options))))
