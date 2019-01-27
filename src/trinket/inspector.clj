@@ -322,6 +322,14 @@
       (collapse! inspector path)
       (expand! inspector path))))
 
+(defn- safe-dec [x]
+  (max 0 ((fnil dec 0) x)))
+
+(def safe-inc (fnil inc 0))
+
+(defn- scroll-seq! [inspector path fun]
+  (swap-options! inspector update-in [::offsets path] fun))
+
 (defn- cursor [{:keys [options-atom] :as inspector}]
   (::cursor @options-atom))
 
@@ -364,14 +372,16 @@
         (swap-options! inspector update ::cursor path/point-to-val))
 
       ;; up to go to previous key or value
-      (and (= :up direction) (not (::first cur-comp)))
-      (do
-        (dbg "up to go to previous key or value")
+      (= :up direction)
+      (if (::first cur-comp)
+        (scroll-seq! inspector (path/up cur) safe-dec)
         (swap-options! inspector update ::cursor path/left))
 
       ;; down to go to next key or value
-      (and (= :down direction) (not (::last cur-comp)))
-      (swap-options! inspector update ::cursor path/right)
+      (= :down direction)
+      (if (::last cur-comp)
+        (scroll-seq! inspector (path/up cur) safe-inc)
+        (swap-options! inspector update ::cursor path/right))
 
       ;; down on the last element to go up again - disabled for now, I think this is confusing
       ;; (and (#{:down :right} direction) (::last (ui/find-component ui ::cursor)))
@@ -431,14 +441,6 @@
 
 (defn- is-shortcut-down? [^KeyEvent e]
   (.isMetaDown e))
-
-(defn- safe-dec [x]
-  (max 0 ((fnil dec 0) x)))
-
-(def safe-inc (fnil inc 0))
-
-(defn- scroll-seq! [inspector path fun]
-  (swap-options! inspector update-in [::offsets path] fun))
 
 (defn- show-less! [inspector path {::keys [page-length]}]
   (swap-options! inspector update-in [::lengths path]

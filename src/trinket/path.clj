@@ -41,7 +41,7 @@
   (if (empty? path)
     path
     (let [[row col] (take-last 2 path)]
-      (vec (concat (drop-last 2 path) [(dec row) col])))))
+      (vec (concat (drop-last 2 path) [(dec-or-zero row) col])))))
 
 (defn first [path]
   (if (empty? path)
