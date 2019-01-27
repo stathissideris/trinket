@@ -99,12 +99,12 @@
       ::table-row   true
       ::ui/children (cons (when show-indexes
                             (-> (annotation (+ offset row-idx))
-                                (assoc ::click-path (conj path row-idx))))
+                                (assoc ::click-path (conj path (+ offset row-idx)))))
                           (map-indexed
                            (fn [col-idx k]
                              (merge
                               (-> (data->ui (get data k)
-                                            {::path (conj path row-idx col-idx)}
+                                            {::path (conj path (+ offset row-idx) col-idx)}
                                             options)
                                   (assoc-bounds col-idx last-col-idx))
                               {::cell true}))
@@ -165,7 +165,7 @@
              ::path        path
              ::ui/children
              (for [[idx v] (map-indexed vector data)]
-               (let [value-path (conj path idx)]
+               (let [value-path (conj path (+ idx offset))]
                  (ui/horizontal
                   {::ui/children
                    [ ;;opening
@@ -474,9 +474,7 @@
     (ui/find-component ui #(= cur (::path %)))))
 
 (defn- value-at-cursor [data {::keys [cursor offsets] :as options}]
-  (let [parent (path/up cursor)
-        offset (get offsets parent 0)]
-    (path/get-in data (path/offset cursor offset))))
+  (path/get-in data cursor))
 
 (defn- def-value-at-cursor! [{:keys [data-atom options-atom] :as inspector}]
   (let [val (value-at-cursor @data-atom @options-atom)]
@@ -664,9 +662,9 @@
       {:name "Nick" :surname "Nolte" :activity "music"}
       {:name "Cecil" :surname "Adams" :activity "music"}
       {:name "Salvador" :surname "Dali" :activity "music"}
-      {:name "Speedy0" :surname "Gonzales0" :activity ["music" "running"]}
-      {:name "Speedy1" :surname "Gonzales1" :activity "music"}
-      {:name "Speedy2" :surname "Gonzales2" :activity "music"}
+      {:name "Speedy0" :surname "Gonzales0" :activity ["music1" "running"]}
+      {:name "Speedy1" :surname "Gonzales1" :activity ["music2" "a" "b" "c"]}
+      {:name "Speedy2" :surname "Gonzales2" :activity ["music3" "d" "e" "f"]}
       {:name "Speedy3" :surname "Gonzales3" :activity "music"}
       {:name "Speedy4" :surname "Gonzales4" :activity "music"}
       {:name "Speedy5" :surname "Gonzales5" :activity "music"}
@@ -680,10 +678,10 @@
       {:name "Speedy13" :surname "Gonzales13" :activity "music"}
       {:name "Speedy14" :surname "Gonzales14" :activity "music"}
       {:name "Speedy15" :surname "Gonzales15" :activity "music"}
-      {:name "Speedy16" :surname "Gonzales16" :activity "music"}
-      {:name "Speedy17" :surname "Gonzales17" :activity "music"}
-      {:name "Speedy18" :surname "Gonzales18" :activity "music"}
-      {:name "Speedy19" :surname "Gonzales19" :activity "music"}])])
+      {:name "Speedy16" :surname "Gonzales16" :activity "music" :extra "extra0"}
+      {:name "Speedy17" :surname "Gonzales17" :activity "music" :extra "extra1"}
+      {:name "Speedy18" :surname "Gonzales18" :activity "music" :extra "extra2"}
+      {:name "Speedy19" :surname "Gonzales19" :activity "music" :extra "extra3"}])])
 
   (def the-data
     {:a             10000
