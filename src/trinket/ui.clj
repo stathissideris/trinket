@@ -2,7 +2,7 @@
   (:require [clojure.zip :as zip]
             ;;[trinket.perf :as perf]
             )
-  (:import [java.awt Graphics2D Color Font Rectangle]
+  (:import [java.awt Graphics2D Color Font Rectangle RenderingHints]
            [javax.swing SwingUtilities JComponent JLabel]))
 
 (def default-font-size 11)
@@ -135,6 +135,37 @@
         :else
         (assoc (->Text) ::text (str x))))
 
+(defn grow-bounds [{::keys [ax ay x y w h] :as component} d]
+  (merge
+   component
+   {::x (- x d)
+    ::y (- y d)
+    ::w (+ w (* 2 d))
+    ::h (+ h (* 2 d))}
+   (when (and ax ay)
+     {::ax (- ax d)
+      ::ay (- ay d)})))
+
+(defrecord Dot []
+  Component
+  (paint! [{::keys [ax ay size color filled visible]} g]
+    (when visible
+      (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON) ;;TODO maybe turn this back off? or turn it on earlier on
+      (.setColor g color)
+      (if filled
+        (.fillOval g (+ ax (/ size 2)) (+ ay (/ size 2)) size size)
+        (.drawOval g (+ ax (/ size 2)) (+ ay (/ size 2)) size size))))
+  (ideal-size [this] this)
+  (layout [this] (grow-bounds this 4)))
+
+(defn dot [{::keys [x y size color visible filled]
+            :or {x       0
+                 y       0
+                 size    7
+                 color   Color/LIGHT_GRAY
+                 filled  true
+                 visible true}}]
+  (map->Dot {::x x ::y y ::w size ::h size ::size size ::color color ::visible visible ::filled filled}))
 
 (defn safe-max [coll]
   (if (empty? coll)
@@ -254,12 +285,6 @@
    (merge options
           {::layout "vertical"
            ::children (mapv #(row {::children [%]}) children)})))
-
-(defn grow-bounds [{::keys [ax ay w h]} d]
-  {::ax (- ax d)
-   ::ay (- ay d)
-   ::w  (+ w (* 2 d))
-   ::h  (+ h (* 2 d))})
 
 (defn zipper [elem]
   (zip/zipper ::children

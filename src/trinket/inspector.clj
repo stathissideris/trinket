@@ -149,7 +149,7 @@
 (defn sequential->ui [data
                       {::keys [path] :as attr}
                       {::keys [cursor expanded opening closing indent-str show-indexes offset
-                               suppress-indexes tables]
+                               suppress-indexes tables marked]
                        :or {offset 0}
                        :as options}]
   (cond (not (get expanded path))
@@ -179,13 +179,17 @@
                     (let [value-ui (data->ui v (-> {::path value-path}
                                                    (assoc-bounds idx last-idx))
                                              (dissoc options ::indent-str ::offset ::suppress-indexes))]
-                      (if (and show-indexes (not suppress-indexes))
-                        (ui/horizontal
-                         {::ui/children
-                          [(-> (annotation (str (+ idx offset)))
-                               (assoc ::click-path value-path))
-                           value-ui]})
-                        value-ui))
+                      (ui/horizontal
+                       {::ui/children
+                        (remove
+                         nil?
+                         [(when (and show-indexes (not suppress-indexes))
+                            (-> (annotation (str (+ idx offset)))
+                                (assoc ::click-path value-path)))
+                          (when-let [{::keys    [pred]
+                                      ::ui/keys [color]} (get marked path)]
+                            (ui/dot {::ui/size 7 ::color color ::ui/visible (pred v)}))
+                          value-ui])}))
 
                     ;; closing
                     (if (= idx last-idx)
@@ -318,6 +322,30 @@
    (let [{:keys [options-atom]} (or inspector @last-inspector)]
      (reset! options-atom options))
    nil)) ;;prevent print explosion
+
+(defn mark!
+  ([pred]
+   (mark! nil pred))
+  ([inspector pred]
+   (let [{:keys [options-atom]} (or inspector @last-inspector)]
+     (swap! options-atom assoc-in [::marked (::cursor @options-atom) ::pred] pred))
+   nil))
+
+(defn unmark!
+  ([]
+   (unmark! nil))
+  ([inspector]
+   (let [{:keys [options-atom]} (or inspector @last-inspector)]
+     (swap! options-atom update ::marked dissoc (::cursor @options-atom)))
+   nil))
+
+(defn unmark-all!
+  ([]
+   (unmark-all! nil))
+  ([inspector]
+   (let [{:keys [options-atom]} (or inspector @last-inspector)]
+     (swap! options-atom dissoc ::marked))
+   nil))
 
 (defn- swap-options! [{:keys [options-atom] :as inspector} & args]
   (apply swap! options-atom args)
@@ -513,6 +541,7 @@
       KeyEvent/VK_UP     (move-cursor! inspector :up)
       KeyEvent/VK_DOWN   (move-cursor! inspector :down)
 
+      KeyEvent/VK_U      (unmark! inspector)
       KeyEvent/VK_I      (swap-options! inspector update ::show-indexes not)
       KeyEvent/VK_F      (if (is-shift-down? e)
                            (swap-options! inspector assoc ::focus [])
