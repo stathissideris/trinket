@@ -1,5 +1,5 @@
 (ns trinket.path
-  (:refer-clojure :exclude [first last get-in]))
+  (:refer-clojure :exclude [first get-in]))
 
 (defn val? [path] (= ::val (clojure.core/last path)))
 (defn key? [path] (= ::key (clojure.core/last path)))
@@ -53,6 +53,11 @@
 
 (defn point-to-key [path] (conj (vec (butlast path)) ::key))
 (defn point-to-val [path] (conj (vec (butlast path)) ::val))
+
+(defn offset [path x]
+  (if (number? (last path))
+    (vec (concat (butlast path) [(+ x (last path))]))
+    path))
 
 (defn get-in [data path]
   (let [sentinel (Object.)]

@@ -62,7 +62,8 @@ Clojure data inspector
 - [x] BUG: navigation doesn't work in expanded table cells
 - [x] BUG: component attributes and options are complected
 - [ ] BUG: expand first map in collection of maps and start scrolling,
-      see what happens. Same for <d>
+      see what happens.
+- [x] BUG: <d> ignores offset
 - [ ] reinstate grid padding
 
 ## REPL workflows

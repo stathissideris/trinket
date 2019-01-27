@@ -473,6 +473,14 @@
         cur (cursor inspector)]
     (ui/find-component ui #(= cur (::path %)))))
 
+(defn- value-at-cursor [data {::keys [cursor offsets] :as options}]
+  (let [parent (path/up cursor)
+        offset (get offsets parent 0)]
+    (path/get-in data (path/offset cursor offset))))
+
+(defn- def-value-at-cursor! [{:keys [data-atom options-atom] :as inspector}]
+  (let [val (value-at-cursor @data-atom @options-atom)]
+    (alter-var-root #'trinket/x (fn [_] val))))
 
 (defn- key-pressed [{:keys [data-atom ui-atom options-atom] :as inspector} ^KeyEvent e]
   (let [cur       (cursor inspector)
@@ -510,7 +518,7 @@
                            (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
                            (show-less! inspector (cursor inspector) @options-atom))
 
-      KeyEvent/VK_D      (alter-var-root #'trinket/x (fn [_] (path/get-in @data-atom (cursor inspector))))
+      KeyEvent/VK_D      (def-value-at-cursor! inspector)
 
       ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
       ;; \0 (reset! font-size default-font-size)
