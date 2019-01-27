@@ -112,13 +112,17 @@
              ::ui/children
              (concat
               [(ui/row {::ui/children (into [nil] (map #(atom->ui %
-                                                                   nil
-                                                                   (assoc options
-                                                                          ::underline true
-                                                                          ::text (alias/shorten % aliases))) total-keys))})]
+                                                                  nil
+                                                                  (assoc options
+                                                                         ::underline true
+                                                                         ::text (alias/shorten % aliases))) total-keys))})]
               (map (fn [idx row]
                      (ui/row
-                      {::ui/children (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil options) total-keys))}))
+                      (merge
+                       (when (zero? idx) {::first true})
+                       (when (= idx (-> data count dec)) {::last true})
+                       {::path        (conj path idx)
+                        ::ui/children (cons (annotation (+ offset idx)) (map #(atom->ui (get row %) nil (assoc options ::cell true)) total-keys))})))
                    (range) data))})]})
         (config-component data path options))))
 
