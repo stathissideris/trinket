@@ -51,6 +51,14 @@
         (assoc path (dec last-nth) 0)
         (assoc path last-nth 0)))))
 
+(defn jump [path idx]
+  (if (empty? path)
+    path
+    (let [last-nth (dec (count path))]
+      (if (in-map? path)
+        (assoc path (dec last-nth) idx)
+        (assoc path last-nth idx)))))
+
 (defn point-to-key [path] (conj (vec (butlast path)) ::key))
 (defn point-to-val [path] (conj (vec (butlast path)) ::val))
 

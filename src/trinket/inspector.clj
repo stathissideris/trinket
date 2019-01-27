@@ -95,19 +95,21 @@
                                      :or    {offset 0}}]
   (let [last-col-idx (dec (count data))]
     (ui/row
-     {::path        (conj path row-idx)
+     {::path        (conj path (+ row-idx offset))
       ::table-row   true
       ::ui/children (cons (when show-indexes
-                            (-> (annotation (+ offset row-idx))
-                                (assoc ::click-path (conj path (+ offset row-idx)))))
+                            (-> (annotation (+ row-idx offset))
+                                (assoc ::click-path (conj path (+ row-idx offset)))))
                           (map-indexed
                            (fn [col-idx k]
-                             (merge
-                              (-> (data->ui (get data k)
-                                            {::path (conj path (+ offset row-idx) col-idx)}
-                                            options)
-                                  (assoc-bounds col-idx last-col-idx))
-                              {::cell true}))
+                             (let [path (conj path (+ row-idx offset) col-idx)]
+                               (merge
+                                (-> (data->ui (get data k)
+                                              {::path       path
+                                               ::click-path path}
+                                              options)
+                                    (assoc-bounds col-idx last-col-idx))
+                                {::cell true})))
                            total-keys))})))
 
 (defn- total-keys [data]
@@ -347,10 +349,16 @@
 (defn- cursor [{:keys [options-atom] :as inspector}]
   (::cursor @options-atom))
 
+(defn- parent-component [ui path]
+  (when-let [parent-path (path/up path)]
+    (ui/find-component ui #(= parent-path (::path %)))))
+
 (defn- move-cursor! [{:keys [ui-atom options-atom] :as inspector} direction]
   (let [ui       @ui-atom
+        options  @options-atom
         cur      (cursor inspector)
-        cur-comp (ui/find-component ui #(= cur (::path %)))]
+        cur-comp (ui/find-component ui #(= cur (::path %)))
+        offset   (-> options ::offsets (get cur 0))]
     (cond
       ;;TABLE navigation
       (and (= :right direction) (::cell cur-comp) (not (::last cur-comp)))
@@ -362,10 +370,16 @@
         (swap-options! inspector update ::cursor path/left))
 
       (and (= :down direction) (::cell cur-comp))
-      (swap-options! inspector update ::cursor path/next-row)
+      (do
+        (when (::last (parent-component ui cur)) ;; when the cell is in the last row
+          (scroll-seq! inspector (-> cur path/up path/up) safe-inc)) ;; ...scroll down
+        (swap-options! inspector update ::cursor path/next-row))
 
       (and (= :up direction) (::cell cur-comp))
-      (swap-options! inspector update ::cursor path/previous-row)
+      (do
+        (when (::first (parent-component ui cur)) ;; when the cell is in the first row
+          (scroll-seq! inspector (-> cur path/up path/up) safe-dec)) ;; ...scroll up
+        (swap-options! inspector update ::cursor path/previous-row))
 
       ;; going in!
       (= :in direction)
@@ -373,7 +387,7 @@
         (when (and (not= tag :atom) (or (expanded? inspector cur) (::table-row cur-comp)))
           (if (= tag :map)
             (swap-options! inspector update ::cursor conj 0 ::path/key)
-            (swap-options! inspector update ::cursor conj 0))))
+            (swap-options! inspector update ::cursor conj offset))))
 
       ;; left to go from map value to map key
       (and (= :left direction) (path/val? cur))
@@ -389,19 +403,15 @@
 
       ;; up to go to previous key or value
       (= :up direction)
-      (if (::first cur-comp)
-        (scroll-seq! inspector (path/up cur) safe-dec)
+      (do ;; make purer
+        (when (::first cur-comp) (scroll-seq! inspector (path/up cur) safe-dec))
         (swap-options! inspector update ::cursor path/left))
 
       ;; down to go to next key or value
       (= :down direction)
-      (if (::last cur-comp)
-        (scroll-seq! inspector (path/up cur) safe-inc)
+      (do ;; make purer
+        (when (::last cur-comp) (scroll-seq! inspector (path/up cur) safe-inc))
         (swap-options! inspector update ::cursor path/right))
-
-      ;; down on the last element to go up again - disabled for now, I think this is confusing
-      ;; (and (#{:down :right} direction) (::last (ui/find-component ui ::cursor)))
-      ;; (swap-options! inspector update ::cursor path/up)
 
       ;; left to get out of structure
       (and (#{:left :up} direction) (::first cur-comp))
@@ -413,11 +423,8 @@
       (and (= :left direction) (not (::first cur-comp)))
       (do
         (dbg "left to go to top of structure")
-        (swap-options! inspector update ::cursor path/first))
-
-      ;; right to go to bottom of structure
-      ;;(and (= :right direction) (not (::last (ui/find-component ui ::cursor))))
-      ;;(swap-options! inspector update ::cursor path/last)
+        (swap-options! inspector update ::cursor
+                       path/jump (-> options ::offsets (get (path/up cur) 0))))
 
       ;; right to go into structure
       (= :right direction)
@@ -426,9 +433,10 @@
         (when (and (not= tag :atom) (expanded? inspector cur))
           (if (= tag :map)
             (swap-options! inspector update ::cursor conj 0 ::path/key)
-            (swap-options! inspector update ::cursor conj 0))))
+            (swap-options! inspector update ::cursor conj offset))))
 
-      :else                                              nil)))
+      :else
+      nil)))
 
 (defn- mouse-clicked [{:keys [ui-atom options-atom] :as inspector} ^MouseEvent e]
   (when-let [match (ui/component-at-point
