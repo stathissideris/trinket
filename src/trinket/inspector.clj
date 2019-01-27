@@ -9,7 +9,7 @@
             [clojure.string :as str]
             [clojure.zip :as zip])
   (:import [java.awt Toolkit Graphics2D Dimension]
-           [java.awt.event KeyListener KeyEvent MouseListener MouseEvent]
+           [java.awt.event KeyListener KeyEvent MouseListener MouseMotionListener MouseEvent]
            [java.awt.datatransfer StringSelection]
            [javax.swing JPanel JFrame JScrollPane JScrollBar BorderFactory]))
 
@@ -224,7 +224,8 @@
          [(when prefixed (ui/text {::ui/text    (str "#:" (namespace (ffirst data)))
                                    ::click-path path}))
           (ui/grid
-           {::ui/children
+           {::ui/class    "main-map-grid"
+            ::ui/children
             (for [[idx [k v]] (map-indexed vector data)]
               (let [key-path (conj path idx ::path/key)
                     val-path (conj path idx ::path/val)]
@@ -232,25 +233,25 @@
                  {::ui/children
                   [ ;;opening
                    (if (zero? idx)
-                     (-> (ui/text "{") (assoc ::click-path path)) ;;assoc path to allow mouse selection of whole map
+                     (-> (ui/text "{") (assoc ::click-path path ::ui/class "opening-brace")) ;;assoc path to allow mouse selection of whole map
                      (ui/text " "))
 
                    ;;key
                    (if (get expanded key-path)
-                     (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx))
+                     (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx ::ui/class "map-key"))
                      (let [k-text (if prefixed
                                     (str ":" (name k))
                                     (pr-str k))]
-                       (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx))))
+                       (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx ::ui/class "map-key"))))
 
                    (ui/text " ")
 
                    ;;value
-                   (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx))
+                   (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::ui/class "map-value"))
 
                    ;; closing
                    (if (= idx last-idx)
-                     (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw"))
+                     (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw" ::ui/class "closing-brace"))
                      (ui/text " "))]})))})]})))))
 
 (defn paint-cursor [ui path ^Graphics2D g]
@@ -394,6 +395,12 @@
     (mouseExited [e])
     (mousePressed [e])
     (mouseReleased [e])))
+
+(defn mouse-position-printer []
+  (proxy [MouseMotionListener] []
+    (mouseDragged [e])
+    (mouseMoved [^MouseEvent e]
+      (println "X:" (.getX e) "Y:" (.getY e)))))
 
 (defn- is-shortcut-down? [^KeyEvent e]
   (.isMetaDown e))
@@ -555,7 +562,9 @@
      ;;listeners
      (doto panel
        (.setBorder (BorderFactory/createEmptyBorder))
-       (.addMouseListener (mouse-listener inspector)))
+       (.addMouseListener (mouse-listener inspector))
+       ;;(.addMouseMotionListener (mouse-position-printer))
+       )
      (doto frame
        (.setFocusTraversalKeysEnabled false) ;; so that <TAB> can be detected
        (.addKeyListener (key-listener inspector))
@@ -594,34 +603,34 @@
               :ccccc         "This is a test"}))
 
   (inspect
-    ["foo"
-     (concat
-      [{:name "Stathis" :surname "Sideris" :activity "coding"}
-       {:name "Tom" :surname "Waits" :activity "music"}
-       {:name "Adam" :surname "Harris" :activity "music"}
-       {:name "Nick" :surname "Nolte" :activity "music"}
-       {:name "Cecil" :surname "Adams" :activity "music"}
-       {:name "Salvador" :surname "Dali" :activity "music"}
-       {:name "Speedy0" :surname "Gonzales0" :activity ["music" "running"]}
-       {:name "Speedy1" :surname "Gonzales1" :activity "music"}
-       {:name "Speedy2" :surname "Gonzales2" :activity "music"}
-       {:name "Speedy3" :surname "Gonzales3" :activity "music"}
-       {:name "Speedy4" :surname "Gonzales4" :activity "music"}
-       {:name "Speedy5" :surname "Gonzales5" :activity "music"}
-       {:name "Speedy6" :surname "Gonzales6" :activity "music"}
-       {:name "Speedy7" :surname "Gonzales7" :activity "music"}
-       {:name "Speedy8" :surname "Gonzales8" :activity "music"}
-       {:name "Speedy9" :surname "Gonzales9" :activity "music"}
-       {:name "Speedy10" :surname "Gonzales10" :activity "music"}
-       {:name "Speedy11" :surname "Gonzales11" :activity "music"}
-       {:name "Speedy12" :surname "Gonzales12" :activity "music"}
-       {:name "Speedy13" :surname "Gonzales13" :activity "music"}
-       {:name "Speedy14" :surname "Gonzales14" :activity "music"}
-       {:name "Speedy15" :surname "Gonzales15" :activity "music"}
-       {:name "Speedy16" :surname "Gonzales16" :activity "music"}
-       {:name "Speedy17" :surname "Gonzales17" :activity "music"}
-       {:name "Speedy18" :surname "Gonzales18" :activity "music"}
-       {:name "Speedy19" :surname "Gonzales19" :activity "music"}])])
+   ["foo"
+    (concat
+     [{:name "Stathis" :surname "Sideris" :activity "coding"}
+      {:name "Tom" :surname "Waits" :activity "music"}
+      {:name "Adam" :surname "Harris" :activity "music"}
+      {:name "Nick" :surname "Nolte" :activity "music"}
+      {:name "Cecil" :surname "Adams" :activity "music"}
+      {:name "Salvador" :surname "Dali" :activity "music"}
+      {:name "Speedy0" :surname "Gonzales0" :activity ["music" "running"]}
+      {:name "Speedy1" :surname "Gonzales1" :activity "music"}
+      {:name "Speedy2" :surname "Gonzales2" :activity "music"}
+      {:name "Speedy3" :surname "Gonzales3" :activity "music"}
+      {:name "Speedy4" :surname "Gonzales4" :activity "music"}
+      {:name "Speedy5" :surname "Gonzales5" :activity "music"}
+      {:name "Speedy6" :surname "Gonzales6" :activity "music"}
+      {:name "Speedy7" :surname "Gonzales7" :activity "music"}
+      {:name "Speedy8" :surname "Gonzales8" :activity "music"}
+      {:name "Speedy9" :surname "Gonzales9" :activity "music"}
+      {:name "Speedy10" :surname "Gonzales10" :activity "music"}
+      {:name "Speedy11" :surname "Gonzales11" :activity "music"}
+      {:name "Speedy12" :surname "Gonzales12" :activity "music"}
+      {:name "Speedy13" :surname "Gonzales13" :activity "music"}
+      {:name "Speedy14" :surname "Gonzales14" :activity "music"}
+      {:name "Speedy15" :surname "Gonzales15" :activity "music"}
+      {:name "Speedy16" :surname "Gonzales16" :activity "music"}
+      {:name "Speedy17" :surname "Gonzales17" :activity "music"}
+      {:name "Speedy18" :surname "Gonzales18" :activity "music"}
+      {:name "Speedy19" :surname "Gonzales19" :activity "music"}])])
 
   (def the-data
     {:a             10000
@@ -693,6 +702,10 @@
                      ::cursor   [1]
                      ::expanded #{[] [1]}}))
   (set-data! the-data)
+
+  (set-data! {:inner1 20
+              :inner2 20
+              :inner3 20})
 
   (-> (ui/find-component @(:ui-atom @last-inspector) ::cursor)
       (dissoc ::ui/children)

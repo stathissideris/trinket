@@ -222,7 +222,7 @@
         (map-grid (fn [r c child]
                     (when child
                       (let [x (get x-positions c)
-                            y (get y-positions r)
+                            y 0
                             w (get column-widths c)
                             h (get row-heights r)]
                         (merge child
