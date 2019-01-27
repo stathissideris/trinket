@@ -463,9 +463,6 @@
     (mouseMoved [^MouseEvent e]
       (println "X:" (.getX e) "Y:" (.getY e)))))
 
-(defn- is-shortcut-down? [^KeyEvent e]
-  (.isMetaDown e))
-
 (defn- show-less! [inspector path {::keys [page-length]}]
   (swap-options! inspector update-in [::lengths path]
                  (fn [x]
@@ -487,6 +484,9 @@
 (defn- def-value-at-cursor! [{:keys [data-atom options-atom] :as inspector}]
   (let [val (value-at-cursor @data-atom @options-atom)]
     (alter-var-root #'trinket/x (fn [_] val))))
+
+(defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
+(defn- is-shift-down? [^KeyEvent e] (.isShiftDown e))
 
 (defn- key-pressed [{:keys [data-atom ui-atom options-atom] :as inspector} ^KeyEvent e]
   (let [cur       (cursor inspector)
@@ -513,7 +513,12 @@
       KeyEvent/VK_UP     (move-cursor! inspector :up)
       KeyEvent/VK_DOWN   (move-cursor! inspector :down)
 
-      KeyEvent/VK_S      (swap-options! inspector update ::show-indexes not)
+      KeyEvent/VK_I      (swap-options! inspector update ::show-indexes not)
+      KeyEvent/VK_F      (if (is-shift-down? e)
+                           (swap-options! inspector assoc ::focus [])
+                           (swap-options! inspector #(-> %
+                                                         (assoc ::focus cur)
+                                                         (assoc ::cursor []))))
 
       KeyEvent/VK_0      (when (is-shortcut-down? e)
                            (swap-options! inspector update ::scale (constantly 1)))
@@ -540,8 +545,12 @@
 
 (defrecord Inspector [data-atom options-atom ui-atom frame])
 
-(defn- make-new-ui [data options]
-  (-> (data->ui data {::path []} options)
+(defn- make-new-ui [data {::keys [focus]
+                          :or {focus []}
+                          :as options}]
+  (-> data
+      (path/get-in focus)
+      (data->ui {::path []} options)
       (assoc ::ui/x 10 ::ui/y 10)
       ui/layout
       ui/add-absolute-coords))
