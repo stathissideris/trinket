@@ -59,8 +59,11 @@ Clojure data inspector
 - [ ] BUG: Can't expand `{:a (range 100)}`
 - [x] BUG: Can't go left from an expanded map, up to a lazy seq
 - [ ] BUG: <d> doesn't work as expected in table cells
-- [ ] BUG: navigation doesn't work in expanded table cells
-- [ ] BUG: component attributes and options are complected
+- [x] BUG: navigation doesn't work in expanded table cells
+- [x] BUG: component attributes and options are complected
+- [ ] BUG: expand first map in collection of maps and start scrolling,
+      see what happens. Same for <d>
+- [ ] reinstate grid padding
 
 ## REPL workflows
 

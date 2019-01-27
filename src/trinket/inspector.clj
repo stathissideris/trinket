@@ -41,7 +41,7 @@
     (lazy? x)                       :lazy-seq
     :else                           :atom))
 
-(defmulti data->ui (fn [data path options] (collection-tag data)))
+(defmulti data->ui (fn [data attr options] (collection-tag data)))
 
 (defn annotation
   ([x]
@@ -64,27 +64,17 @@
 (defn- indicate-lazy [ui]
   (ui/horizontal {::ui/children [(annotation "L") ui]}))
 
-(defn- config-component [ui data path {::keys [idx last-idx cursor]}]
-  (cond-> ui
-    :always (merge {::path       path
-                    ::click-path path
-                    ::index      idx
-                    ::tag        (collection-tag data)})
-    (and idx (zero? idx)) (assoc ::first true)
-    (and idx (= idx last-idx)) (assoc ::last true)))
-
-(defn atom->ui [data path {::keys [text page-length underline] :as options}]
-  (let [color (cond (keyword? data) ui/color-keywords
-                    (string? data)  ui/color-strings
-                    :else           ui/color-text)]
-    (-> (ui/text (merge
-                  options
-                  {::ui/text      (if text text
-                                      (binding [*print-length* page-length]
-                                        (pr-str data)))
-                   ::ui/color     color
-                   ::ui/underline underline}))
-        (config-component data path options))))
+(defn atom->ui [data attr {::keys [text page-length] :as options}]
+  (ui/text
+   (merge
+    attr
+    {::ui/text  (if text text
+                    (binding [*print-length* page-length]
+                      (pr-str data)))
+     ::ui/color (cond (keyword? data) ui/color-keywords
+                      (string? data)  ui/color-strings
+                      :else           ui/color-text)
+     ::tag      (collection-tag data)})))
 
 (defn- aliases-panel [aliases]
   (ui/vertical
@@ -95,92 +85,110 @@
 (defn- tabular-data? [data]
   (every? map? data))
 
-(defn- data-table [data path {::keys [offset]
-                              :as    options
-                              :or    {offset 0}}]
-  (let [total-keys (sort (distinct (mapcat keys data)))
-        nss        (distinct (remove nil? (map namespace total-keys)))
-        aliases    (alias/make-aliases nss)]
-    (-> (ui/vertical
-         {::display     ::table
-          ::ui/children
-          [(-> (annotation (str "TABLE"
-                                (when-not (lazy? data)
-                                  (str " (" (count data) " ROWS, " (count total-keys) " COLUMNS)"))))
-               (assoc ::path path ::click-path path))
-           (when aliases (aliases-panel aliases))
-           (ui/grid
-            {::ui/columns  (inc (count total-keys))
-             ::ui/children
-             (concat
-              ;;header
-              [(ui/row {::ui/children (into [nil] (map #(atom->ui %
-                                                                  nil
-                                                                  (assoc options
-                                                                         ::underline true
-                                                                         ::text (alias/shorten % aliases))) total-keys))})]
+(defn- assoc-bounds [component idx last-idx]
+  (merge component
+         (when (zero? idx) {::first true})
+         (when (= idx last-idx) {::last true})))
 
-              ;;data
-              (map (fn [idx row]
-                     (ui/row
-                      (merge
-                       (when (zero? idx) {::first true})
-                       (when (= idx (-> data count dec)) {::last true})
-                       {::path        (conj path idx)
-                        ::table-row   true
-                        ::ui/children (cons (-> (annotation (+ offset idx))
-                                                (assoc ::click-path (conj path idx)))
-                                            (map-indexed (fn [col-idx k]
-                                                           (data->ui (get row k) (conj path idx col-idx) (assoc options ::cell true)))
-                                                         total-keys))})))
-                   (range) data))})]})
-        (config-component data path options))))
+(defn- table-row [data row-idx path {::keys [offset total-keys show-indexes]
+                                     :as    options
+                                     :or    {offset 0}}]
+  (let [last-col-idx (dec (count data))]
+    (ui/row
+     {::path        (conj path row-idx)
+      ::table-row   true
+      ::ui/children (cons (when show-indexes
+                            (-> (annotation (+ offset row-idx))
+                                (assoc ::click-path (conj path row-idx))))
+                          (map-indexed
+                           (fn [col-idx k]
+                             (merge
+                              (-> (data->ui (get data k)
+                                            {::path (conj path row-idx col-idx)}
+                                            options)
+                                  (assoc-bounds col-idx last-col-idx))
+                              {::cell true}))
+                           total-keys))})))
 
-(defn sequential->ui [data path {::keys [cursor expanded opening closing indent-str show-indexes idx last-idx offset
-                                         suppress-indexes tables]
-                                 :or {offset 0}
-                                 :as options}]
+(defn- total-keys [data]
+  (sort (distinct (mapcat keys data))))
+
+(defn- data-table [data {::keys [path] :as attr} options]
+  (let [t-keys   (total-keys data)
+        nss      (distinct (remove nil? (map namespace t-keys)))
+        aliases  (alias/make-aliases nss)
+        last-idx (dec (count data))]
+    (ui/vertical
+     (merge
+      attr
+      {::display     ::table
+       ::path        path
+       ::tag         (collection-tag data)
+       ::ui/children
+       [(-> (annotation (str "TABLE"
+                             (when-not (lazy? data)
+                               (str " (" (count data) " ROWS, " (count t-keys) " COLUMNS)"))))
+            (assoc ::path path ::click-path path))
+        (when aliases (aliases-panel aliases))
+        (ui/grid
+         {::ui/children
+          (vec
+           (concat
+            ;;header
+            [(ui/row {::ui/children (into [nil] (map #(-> (atom->ui % {} options)
+                                                          (merge {::ui/underline true
+                                                                  ::text         (alias/shorten % aliases)}))
+                                                     t-keys))})]
+            ;;rows
+            (map-indexed #(-> (table-row %2 %1 path (assoc options ::total-keys t-keys))
+                              (assoc-bounds %1 last-idx))
+                         data)))})]}))))
+
+(defn sequential->ui [data
+                      {::keys [path] :as attr}
+                      {::keys [cursor expanded opening closing indent-str show-indexes offset
+                               suppress-indexes tables]
+                       :or {offset 0}
+                       :as options}]
   (cond (not (get expanded path))
-        (atom->ui data path (merge options {::idx idx ::last-idx last-idx}))
+        (atom->ui data attr options)
 
         (and (get tables path) (tabular-data? data))
-        (data-table data path options)
+        (data-table data attr options)
 
         :else
         (let [last-idx (dec (count data))]
           (ui/vertical
-           {::tag         (collection-tag data)
-            ::path        path
-            ::ui/children
-            (for [[idx v] (map-indexed vector data)]
-              (let [value-path (conj path idx)]
-                (ui/horizontal
-                 {::ui/children
-                  [;;opening
-                   (if (zero? idx)
-                     (-> (ui/text opening) (assoc ::click-path path)) ;; assoc path to allow mouse selection of whole map
-                     (ui/text (or indent-str " ")))
+           (merge
+            attr
+            {::tag         (collection-tag data)
+             ::path        path
+             ::ui/children
+             (for [[idx v] (map-indexed vector data)]
+               (let [value-path (conj path idx)]
+                 (ui/horizontal
+                  {::ui/children
+                   [ ;;opening
+                    (if (zero? idx)
+                      (-> (ui/text opening) (assoc ::click-path path)) ;; assoc path to allow mouse selection of whole map
+                      (ui/text (or indent-str " ")))
 
-                   ;;value
-                   (let [value-ui (let [options (merge (-> options (dissoc ::suppress-indexes ::idx ::last-idx
-                                                                           ::first ::last)) ;; suppress-indexes is for one-level only
-                                                       {::idx idx ::last-idx last-idx}
-                                                       (when (zero? idx) {::first true})
-                                                       (when (= idx last-idx) {::last true}))]
-                                    (if (get expanded value-path)
-                                      (data->ui v value-path (dissoc options ::indent-str ::offset)) ;; no need to inherit this
-                                      (data->ui v value-path options)))]
-                     (if (and show-indexes (not suppress-indexes))
-                       (ui/horizontal
-                        {::ui/children
-                         [(annotation (str (+ idx offset)))
-                          value-ui]})
-                       value-ui))
+                    ;;value
+                    (let [value-ui (data->ui v (-> {::path value-path}
+                                                   (assoc-bounds idx last-idx))
+                                             (dissoc options ::indent-str ::offset ::suppress-indexes))]
+                      (if (and show-indexes (not suppress-indexes))
+                        (ui/horizontal
+                         {::ui/children
+                          [(-> (annotation (str (+ idx offset)))
+                               (assoc ::click-path value-path))
+                           value-ui]})
+                        value-ui))
 
-                   ;; closing
-                   (if (= idx last-idx)
-                     (-> (ui/text closing) (assoc ::click-path path ::ui/alignment "sw"))
-                     (ui/text " "))]})))}))))
+                    ;; closing
+                    (if (= idx last-idx)
+                      (-> (ui/text closing) (assoc ::click-path path ::ui/alignment "sw"))
+                      (ui/text " "))]})))})))))
 
 (defn- data-page [data path {::keys [page-length lengths offsets] :as options}]
   (let [offset (get offsets path 0)]
@@ -189,29 +197,27 @@
                   (drop offset)
                   (take (get lengths path page-length)))}))
 
-(defn lazy->ui [data path {::keys [expanded page-length lengths offsets] :as options}]
-  (let [{:keys [data offset]} (data-page data path options)]
-    (indicate-lazy (sequential->ui data path (assoc options ::offset offset)))))
-
 (defmethod data->ui :atom
-  [data path options]
-  (atom->ui data path options))
+  [data attr options]
+  (atom->ui data attr options))
 
 (defmethod data->ui :lazy-seq
-  [data path options]
-  (lazy->ui data path (assoc options ::opening "(" ::closing ")")))
+  [data {::keys [path] :as attr} options]
+  (let [{:keys [data offset]} (data-page data path options)]
+    (indicate-lazy
+     (sequential->ui data attr (assoc options ::offset offset ::opening "(" ::closing ")")))))
 
 (defmethod data->ui :vector
-  [data path options]
-  (sequential->ui data path (assoc options ::opening "[" ::closing "]")))
+  [data attr options]
+  (sequential->ui data attr (assoc options ::opening "[" ::closing "]")))
 
 (defmethod data->ui :list
-  [data path options]
-  (sequential->ui data path (assoc options ::opening "(" ::closing ")")))
+  [data attr options]
+  (sequential->ui data attr (assoc options ::opening "(" ::closing ")")))
 
 (defmethod data->ui :set
-  [data path options]
-  (sequential->ui data path (assoc options
+  [data attr options]
+  (sequential->ui data attr (assoc options
                                    ::opening "#{" ::closing "}" ::indent-str "  "
                                    ::suppress-indexes true)))
 
@@ -224,14 +230,14 @@
        (apply = (map namespace (keys m)))))
 
 (defmethod data->ui :map
-  [data path {::keys [cursor expanded idx last-idx] :as options}]
+  [data {::keys [path] :as attr} {::keys [expanded] :as options}]
   (if-not (get expanded path)
-    (atom->ui data path options)
+    (atom->ui data attr options)
     (let [last-idx (dec (count data))
           prefixed  (prefixed-map? data)]
       (ui/vertical
        (merge
-        options
+        attr
         {::tag         (collection-tag data)
          ::path        path
          ::ui/children
@@ -247,25 +253,33 @@
                  {::ui/children
                   [ ;;opening
                    (if (zero? idx)
-                     (-> (ui/text "{") (assoc ::click-path path ::ui/class "opening-brace")) ;;assoc path to allow mouse selection of whole map
+                     (-> (ui/text "{")
+                         (merge {::click-path path ::ui/class "opening-brace"})) ;;assoc path to allow mouse selection of whole map
                      (ui/text " "))
 
                    ;;key
                    (if (get expanded key-path)
-                     (data->ui k key-path (assoc options ::idx idx ::last-idx last-idx ::ui/class "map-key"))
+                     (-> (data->ui k {::path key-path} options)
+                         (assoc-bounds idx last-idx)
+                         (merge {::ui/class "map-key"}))
                      (let [k-text (if prefixed
                                     (str ":" (name k))
                                     (pr-str k))]
-                       (data->ui k key-path (assoc options ::text k-text ::idx idx ::last-idx last-idx ::ui/class "map-key"))))
+                       (-> (data->ui k {::path key-path} options)
+                           (assoc-bounds idx last-idx)
+                           (merge {::text k-text ::ui/class "map-key"}))))
 
                    (ui/text " ")
 
                    ;;value
-                   (data->ui v val-path (assoc options ::idx idx ::last-idx last-idx ::ui/class "map-value"))
+                   (-> (data->ui v {::path val-path} options)
+                       (assoc-bounds idx last-idx)
+                       (merge {::ui/class "map-value"}))
 
                    ;; closing
                    (if (= idx last-idx)
-                     (-> (ui/text "}") (assoc ::click-path path ::ui/alignment "sw" ::ui/class "closing-brace"))
+                     (-> (ui/text "}")
+                         (merge {::click-path path ::ui/alignment "sw" ::ui/class "closing-brace"}))
                      (ui/text " "))]})))})]})))))
 
 (defn paint-cursor [ui path ^Graphics2D g]
@@ -339,11 +353,13 @@
         cur-comp (ui/find-component ui #(= cur (::path %)))]
     (cond
       ;;TABLE navigation
-      (and (= :right direction) (::cell cur-comp))
+      (and (= :right direction) (::cell cur-comp) (not (::last cur-comp)))
       (swap-options! inspector update ::cursor path/right)
 
       (and (= :left direction) (::cell cur-comp))
-      (swap-options! inspector update ::cursor path/left)
+      (if (zero? (last cur))
+        (swap-options! inspector update ::cursor path/up) ;;left to get out of row
+        (swap-options! inspector update ::cursor path/left))
 
       (and (= :down direction) (::cell cur-comp))
       (swap-options! inspector update ::cursor path/next-row)
@@ -511,7 +527,7 @@
 (defrecord Inspector [data-atom options-atom ui-atom frame])
 
 (defn- make-new-ui [data options]
-  (-> (data->ui data [] options)
+  (-> (data->ui data {::path []} options)
       (assoc ::ui/x 10 ::ui/y 10)
       ui/layout
       ui/add-absolute-coords))
