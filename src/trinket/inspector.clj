@@ -176,20 +176,20 @@
                       (ui/text (or indent-str " ")))
 
                     ;;value
-                    (let [value-ui (data->ui v (-> {::path value-path}
-                                                   (assoc-bounds idx last-idx))
-                                             (dissoc options ::indent-str ::offset ::suppress-indexes))]
-                      (ui/horizontal
-                       {::ui/children
-                        (remove
-                         nil?
-                         [(when (and show-indexes (not suppress-indexes))
-                            (-> (annotation (str (+ idx offset)))
-                                (assoc ::click-path value-path)))
-                          (when-let [{::keys    [pred]
-                                      ::ui/keys [color]} (get marked path)]
-                            (ui/dot {::ui/size 7 ::color color ::ui/visible (pred v)}))
-                          value-ui])}))
+                    (ui/horizontal
+                     {::ui/children
+                      (remove
+                       nil?
+                       [(when (and show-indexes (not suppress-indexes))
+                          (-> (annotation (str (+ idx offset)))
+                              (assoc ::click-path value-path)))
+                        (when-let [{::keys    [pred]
+                                    ::ui/keys [color]} (get marked path)]
+                          (ui/dot {::ui/size 7 ::color color ::ui/visible (pred v)}))
+                        (data->ui v (-> {::path       value-path
+                                         ::click-path value-path}
+                                        (assoc-bounds idx last-idx))
+                                  (dissoc options ::indent-str ::offset ::suppress-indexes))])})
 
                     ;; closing
                     (if (= idx last-idx)
