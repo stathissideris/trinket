@@ -533,8 +533,12 @@
                                               (disj tables path)
                                               (conj tables path)))))
 
-      KeyEvent/VK_COMMA  (scroll-seq! inspector (cursor inspector) safe-dec)
-      KeyEvent/VK_PERIOD (scroll-seq! inspector (cursor inspector) safe-inc)
+      KeyEvent/VK_COMMA  (if (is-shift-down? e)
+                           (scroll-seq! inspector (cursor inspector) #(max 0 (- % 10)))
+                           (scroll-seq! inspector (cursor inspector) safe-dec))
+      KeyEvent/VK_PERIOD (if (is-shift-down? e)
+                           (scroll-seq! inspector (cursor inspector) #(+ % 10))
+                           (scroll-seq! inspector (cursor inspector) safe-inc))
 
       KeyEvent/VK_LEFT   (move-cursor! inspector :left)
       KeyEvent/VK_RIGHT  (move-cursor! inspector :right)
