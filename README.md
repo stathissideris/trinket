@@ -56,7 +56,7 @@ Clojure data inspector
 - [x] BUG: broken scrolling in lazy data structures
 - [x] BUG: keywords can be "expanded"
 - [ ] BUG: Top-level empty maps render as invisible
-- [ ] BUG: Can't expand `{:a (range 100)}`
+- [x] BUG: Can't expand `{:a (range 100)}`
 - [x] BUG: Can't go left from an expanded map, up to a lazy seq
 - [ ] BUG: <d> doesn't work as expected in table cells
 - [x] BUG: navigation doesn't work in expanded table cells

@@ -33,13 +33,14 @@
 
 (defn collection-tag [x]
   (cond
-    (map? x)                        :map
-    (set? x)                        :set
-    (vector? x)                     :vector
-    (list? x)                       :list
-    (string? x)                     :list
-    (lazy? x)                       :lazy-seq
-    :else                           :atom))
+    (map? x)    :map
+    (set? x)    :set
+    (vector? x) :vector
+    (list? x)   :list
+    (string? x) :list
+    (lazy? x)   :lazy-seq
+    (seq? x)    :lazy-seq ;; range for example
+    :else       :atom))
 
 (defmulti data->ui (fn [data attr options] (collection-tag data)))
 
