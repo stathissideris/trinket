@@ -22,11 +22,12 @@
 
 (defonce last-inspector (atom nil))
 
-(def default-options {::cursor       []
-                      ::expanded     #{[]}
-                      ::scale        1
-                      ::show-indexes true
-                      ::page-length  10})
+(def default-options {::cursor        []
+                      ::expanded      #{[]}
+                      ::scale         1
+                      ::show-indexes  true
+                      ::page-length   10
+                      ::string-length 500})
 
 (defn- lazy? [x] (or (instance? clojure.lang.LazySeq x)
                      (instance? clojure.lang.Cons x)))
@@ -91,9 +92,11 @@
          (when (zero? idx) {::first true})
          (when (= idx last-idx) {::last true})))
 
-(defn- table-row [data row-idx path {::keys [offset total-keys show-indexes]
-                                     :as    options
-                                     :or    {offset 0}}]
+(defn- table-row [data
+                  {::keys [row-idx path offset total-keys]
+                   :or    {offset 0}}
+                  {::keys [show-indexes]
+                   :as    options}]
   (let [last-col-idx (dec (count data))]
     (ui/row
      {::path        (conj path (+ row-idx offset))
@@ -116,7 +119,7 @@
 (defn- total-keys [data]
   (sort (distinct (mapcat keys data))))
 
-(defn- data-table [data {::keys [path] :as attr} options]
+(defn- data-table [data {::keys [path lazy length offset] :as attr} options]
   (let [t-keys   (total-keys data)
         nss      (distinct (remove nil? (map namespace t-keys)))
         aliases  (alias/make-aliases nss)
@@ -129,8 +132,9 @@
        ::tag         (collection-tag data)
        ::ui/children
        [(-> (annotation (str "TABLE"
-                             (when-not (lazy? data)
-                               (str " (" (count data) " ROWS, " (count t-keys) " COLUMNS)"))))
+                             (if lazy
+                               (str " (lazy)")
+                               (str " (" length " ROWS, " (count t-keys) " COLUMNS)"))))
             (assoc ::path path ::click-path path))
         (when aliases (aliases-panel aliases))
         (ui/grid
@@ -143,16 +147,23 @@
                                                                 options)
                                                      t-keys))})]
             ;;rows
-            (map-indexed #(-> (table-row %2 %1 path (assoc options ::total-keys t-keys))
+            (map-indexed #(-> (table-row %2
+                                         {::row-idx    %1
+                                          ::path       path
+                                          ::offset     offset
+                                          ::total-keys t-keys}
+                                         options)
                               (assoc-bounds %1 last-idx))
-                         data)))})]}))))
+                         data)
+            (when (not lazy)
+              [(ui/row {::ui/children [nil (ui/text "...")]})])))})]}))))
 
 (defn sequential->ui [data
-                      {::keys [path] :as attr}
-                      {::keys [cursor expanded opening closing indent-str show-indexes offset
-                               suppress-indexes tables marked]
-                       :or {offset 0}
-                       :as options}]
+                      {::keys [path opening closing offset suppress-indexes length indent-str]
+                       :or    {offset 0}
+                       :as    attr}
+                      {::keys [cursor expanded show-indexes tables marked]
+                       :as    options}]
   (cond (not (get expanded path))
         (atom->ui data attr options)
 
@@ -190,19 +201,27 @@
                         (data->ui v (-> {::path       value-path
                                          ::click-path value-path}
                                         (assoc-bounds idx last-idx))
-                                  (dissoc options ::indent-str ::offset ::suppress-indexes))])})
+                                  options)])})
 
                     ;; closing
                     (if (= idx last-idx)
                       (-> (ui/text closing) (assoc ::click-path path ::ui/alignment "sw"))
                       (ui/text " "))]})))})))))
 
-(defn- data-page [data path {::keys [page-length lengths offsets] :as options}]
+(defn- safe-subs [^String s start end]
+  (when s
+    (let [len (.length s)]
+      (subs s (min start len) (min end len)))))
+
+(defn- data-page [data path {::keys [string-length page-length lengths offsets] :as options}]
   (let [offset (get offsets path 0)]
-    {:offset offset
-     :data   (->> data
-                  (drop offset)
-                  (take (get lengths path page-length)))}))
+    (if (string? data)
+      {:offset offset
+       :data   (safe-subs data offset (get lengths path string-length))}
+      {:offset offset
+       :data   (->> data
+                    (drop offset)
+                    (take (get lengths path page-length)))})))
 
 (defmethod data->ui :atom
   [data attr options]
@@ -212,21 +231,45 @@
   [data {::keys [path] :as attr} options]
   (let [{:keys [data offset]} (data-page data path options)]
     (indicate-lazy
-     (sequential->ui data attr (assoc options ::offset offset ::opening "(" ::closing ")")))))
+     (sequential->ui data
+                     (assoc attr
+                            ::lazy true
+                            ::offset offset
+                            ::opening "("
+                            ::closing ")")
+                     options))))
 
 (defmethod data->ui :vector
-  [data attr options]
-  (sequential->ui data attr (assoc options ::opening "[" ::closing "]")))
+  [all-data {::keys [path] :as attr} options]
+  (let [{:keys [data offset]} (data-page all-data path options)]
+    (sequential->ui data
+                    (assoc attr
+                           ::length (count all-data)
+                           ::offset offset
+                           ::opening "["
+                           ::closing "]")
+                    options)))
 
 (defmethod data->ui :list
-  [data attr options]
-  (sequential->ui data attr (assoc options ::opening "(" ::closing ")")))
+  [all-data {::keys [path] :as attr} options]
+  (let [{:keys [data offset]} (data-page all-data path options)]
+    (sequential->ui data
+                    (assoc attr
+                           ::length (count all-data)
+                           ::offset offset
+                           ::opening "("
+                           ::closing ")")
+                    options)))
 
 (defmethod data->ui :set
   [data attr options]
-  (sequential->ui data attr (assoc options
-                                   ::opening "#{" ::closing "}" ::indent-str "  "
-                                   ::suppress-indexes true)))
+  (sequential->ui data
+                  (assoc attr
+                         ::opening "#{"
+                         ::closing "}"
+                         ::indent-str "  "
+                         ::suppress-indexes true)
+                  options))
 
 (defn- prefixed-map?
   "Checks whether the map's keys are uniformly namespaced keywords"
@@ -274,7 +317,7 @@
                                     (pr-str k))]
                        (-> (data->ui k {::path key-path} options)
                            (assoc-bounds idx last-idx)
-                           (merge {::text k-text ::ui/class "map-key"}))))
+                           (merge {::ui/text k-text ::ui/class "map-key"}))))
 
                    (ui/text " ")
 
