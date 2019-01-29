@@ -65,7 +65,7 @@
 (defn- indicate-lazy [ui]
   (ui/horizontal {::ui/children [(annotation "L") ui]}))
 
-(defn atom->ui [data attr {::keys [text page-length] :as options}]
+(defn atom->ui [data {::ui/keys [text] :as attr} {::keys [page-length] :as options}]
   (ui/text
    (merge
     attr
@@ -138,9 +138,9 @@
           (vec
            (concat
             ;;header
-            [(ui/row {::ui/children (into [nil] (map #(-> (atom->ui % {} options)
-                                                          (merge {::ui/underline true
-                                                                  ::text         (alias/shorten % aliases)}))
+            [(ui/row {::ui/children (into [nil] (map #(atom->ui % {::ui/text (alias/shorten % aliases)
+                                                                   ::ui/underline true}
+                                                                options)
                                                      t-keys))})]
             ;;rows
             (map-indexed #(-> (table-row %2 %1 path (assoc options ::total-keys t-keys))

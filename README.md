@@ -65,7 +65,7 @@ Clojure data inspector
       see what happens.
 - [x] BUG: <d> ignores offset
 - [ ] reinstate grid padding
-- [ ] BUG: table headers don't use aliases
+- [x] BUG: table headers don't use aliases
 
 ## REPL workflows
 
