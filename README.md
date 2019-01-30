@@ -99,7 +99,7 @@ do:
 ```
 
 You should see dots next to 2 and 4. You can remove them by pressing
-<kdb>u</kbd> or by doing:
+<kbd>u</kbd> or by doing:
 
 ``` clojure
 (t/unmark!)
