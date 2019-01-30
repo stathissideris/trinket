@@ -2,7 +2,7 @@
 
 Clojure data inspector
 
-##  Differences to clojure.inspector
+## Features (and differences to clojure.inspector)
 
 - The visual representation looks like EDN
 - Shows indexes
@@ -12,7 +12,8 @@ Clojure data inspector
 - You can select things at any level
 - Better keyboard support
 - You can navigate data structures used as keys
-- def the highlighted data for further processing in the REPL.
+- `def` the highlighted data for further processing in the REPL
+- Mark sequence elements that match certain predicates
 
 ## Usage
 
