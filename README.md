@@ -14,6 +14,39 @@ Clojure data inspector
 - You can navigate data structures used as keys
 - def the highlighted data for further processing in the REPL.
 
+## Usage
+
+### Keyboard
+
+* <kbd>up</kbd> Move up one element or select parent structure if
+  you're at the top.
+* <kbd>down</kbd> Move down one element.
+* <kbd>right</kbd> Move one element to the right.
+* <kbd>left</kbd> Move one element to the left. Move to the first
+  element of the sequence. If you are at the first element, select
+  parent structure.
+* <kbd>TAB</kbd> Expand/collapse data structure.
+* <kbd>ENTER</kbd> Go into a data structure.
+* <kbd>.</kbd> "Scroll" down the selected sequence by one element. If
+  the sequence is lazy, this realizes additional
+  elements. <kbd>shift</kbd> + <kbd>.</kbd> scrolls by 10 elements.
+* <kbd>,</kbd> "Scroll" up the selected sequence by one
+  element. <kbd>shift</kbd> + <kbd>,</kbd> scrolls by 10 elements.
+* <kbd>=</kbd> Show more. Expands the window of shown elements in the
+  sequence by 1 element.
+* <kbd>-</kbd> Show less. Contracts the window of shown elements in
+  the sequence by 1 element.
+* <kbd>alt/cmd</kbd> + <kbd>=</kbd> Zoom in.
+* <kbd>alt/cmd</kbd> + <kbd>-</kbd> Zoom out.
+* <kbd>alt/cmd</kbd> + <kbd>0</kbd> Reset zoom.
+* <kbd>t</kbd> Table view. If a sequence of maps is selected, they
+  will presented in a tabular format. Press <kbd>t</kbd> again to
+  switch back to the normal view.
+* <kbd>i</kbd> Toggle sequence index visibility.
+* <kbd>d</kbd> `def` the selected part of the data as the `trinket/x`
+  var.
+* <kbd>u</kbd> Unmark.
+
 ## TODO
 
 - [x] Make closing brace align with the bottom of the last item (see
@@ -70,12 +103,12 @@ Clojure data inspector
 ## REPL workflows
 
 - Highlight something and press `d` to def it and then use it in the
-  REPL.
+  REPL. [DONE!]
 
 - "mark" elements of the current seq according to whether they match a
   predicate or not. Implicit arguments are the inspector (default is
   the last one opened) and the path to mark, but you should be given
-  the option to pass them.
+  the option to pass them. [DONE!]
 
 - show/hide columns of tables
 
