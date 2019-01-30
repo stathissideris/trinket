@@ -16,6 +16,40 @@ Clojure data inspector
 
 ## Usage
 
+### REPL
+
+``` clojure
+(require '[trinket.repl :as t])
+
+(t/inspect {:a [1 2 2 4]
+            :b (range 100)
+            :c {:c1 "foo" :c2 "bar"}})
+```
+
+Subsequently you can:
+
+``` clojure
+(t/set-data! [1 2 3 4])
+```
+
+In order to work with multiple inspectors, hold on to a reference of
+the record returned by `inspect`:
+
+``` clojure
+(def ins (t/inspect {:a [1 2 2 4]
+                     :b (range 100)
+                     :c {:c1 "foo" :c2 "bar"}}))
+```
+
+So that later you can refer to that particular inspector:
+
+``` clojure
+(t/set-data! ins [1 2 3 4])
+```
+
+Inspecting atoms results in the inspector watching the atom for
+changes and updating automatically.
+
 ### Keyboard
 
 * <kbd>up</kbd> Move up one element or select parent structure if
@@ -28,7 +62,7 @@ Clojure data inspector
 * <kbd>TAB</kbd> Expand/collapse data structure.
 * <kbd>ENTER</kbd> Go into a data structure.
 * <kbd>.</kbd> "Scroll" down the selected sequence by one element. If
-  the sequence is lazy, this realizes additional
+  the sequence is lazy, this will realize additional
   elements. <kbd>shift</kbd> + <kbd>.</kbd> scrolls by 10 elements.
 * <kbd>,</kbd> "Scroll" up the selected sequence by one
   element. <kbd>shift</kbd> + <kbd>,</kbd> scrolls by 10 elements.
@@ -42,40 +76,53 @@ Clojure data inspector
 * <kbd>t</kbd> Table view. If a sequence of maps is selected, they
   will presented in a tabular format. Press <kbd>t</kbd> again to
   switch back to the normal view.
-* <kbd>i</kbd> Toggle sequence index visibility.
+* <kbd>i</kbd> Index visibility toggle.
 * <kbd>d</kbd> `def` the selected part of the data as the `trinket/x`
   var.
 * <kbd>u</kbd> Unmark.
 
+### Marking
+
+Do:
+
+``` clojure
+(t/inspect {:a [1 2 4 5]
+            :b (range 100)
+            :c {:c1 "foo" :c2 "bar"}})
+```
+
+Move the cursor so that the vector is highlighted, and from the REPL
+do:
+
+``` clojure
+(t/mark! even?)
+```
+
+You should see dots next to 2 and 4. You can remove them by pressing
+<kdb>u</kbd> or by doing:
+
+``` clojure
+(t/unmark!)
+```
+
+or
+
+``` clojure
+(t/unmark-all!)
+```
+
 ## TODO
 
-- [x] Make closing brace align with the bottom of the last item (see
-      what happens if you expand the last item)
-- [x] Take into account expansion state when doing layout (see what
-      happens when you expand a key that is a map)
-- [x] Place cursor at root of data when starting
 - [ ] Realize lazy seqs in the background
 - [ ] Scroll to follow cursor
-- [x] Don't draw outside visible area
-- [x] BUG: clicking breaks view has been scaled
-- [x] BUG: click to select tables
-- [x] Table view
-- [x] Table view styling
-- [x] BUG: white background when zooming out
-- [ ] Table view navigation
 - [ ] Customisable keys
 - [ ] Customisable themes
 - [ ] Move drop/take code for paging lazy sequences out of drawing
       code and into the event loop. This will allow us to constrain
       scrolling to not go beyond the end of the sequence. Also,
       drawing code should be very lightweight.
-- [x] Improve rendering/scrolling speed for large data structures
-      (especially noticable with tables)
-- [x] Shorten namespaced keys in tables by defining (and displaying)
-      ad-hoc unique aliases
 - [ ] Status area information on focused structure such as element
       count
-- [ ] Paging for non-lazy structures
 - [ ] Turn keyword namespaces on and off
 - [ ] Sorting
 - [ ] BUG: can't go to parent of single-element sequence
@@ -86,19 +133,11 @@ Clojure data inspector
 - [ ] barchart
 - [ ] show aliases on mixed single maps
 - [ ] turn aliases on and off
-- [x] BUG: broken scrolling in lazy data structures
-- [x] BUG: keywords can be "expanded"
 - [ ] BUG: Top-level empty maps render as invisible
-- [x] BUG: Can't expand `{:a (range 100)}`
-- [x] BUG: Can't go left from an expanded map, up to a lazy seq
+
 - [ ] BUG: <d> doesn't work as expected in table cells
-- [x] BUG: navigation doesn't work in expanded table cells
-- [x] BUG: component attributes and options are complected
-- [x] BUG: expand first map in collection of maps and start scrolling,
-      see what happens.
-- [x] BUG: <d> ignores offset
 - [ ] reinstate grid padding
-- [x] BUG: table headers don't use aliases
+- [ ] Test slow lazy sequences
 
 ## REPL workflows
 
