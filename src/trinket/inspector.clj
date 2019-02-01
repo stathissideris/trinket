@@ -66,13 +66,18 @@
 (defn- indicate-lazy [ui]
   (ui/horizontal {::ui/children [(annotation "L") ui]}))
 
+(defn- truncate [s]
+  (if (> (.length s) 100)
+    (str (subs s 0 100) "...")
+    s))
+
 (defn atom->ui [data {::ui/keys [text] :as attr} {::keys [page-length] :as options}]
   (ui/text
    (merge
     attr
     {::ui/text  (if text text
                     (binding [*print-length* page-length]
-                      (pr-str data)))
+                      (truncate (pr-str data))))
      ::ui/color (cond (keyword? data) ui/color-keywords
                       (string? data)  ui/color-strings
                       :else           ui/color-text)
@@ -317,14 +322,14 @@
                                     (pr-str k))]
                        (-> (data->ui k {::path key-path} options)
                            (assoc-bounds idx last-idx)
-                           (merge {::ui/text k-text ::ui/class "map-key"}))))
+                           (merge {::ui/text k-text ::ui/class "map-key" ::click-path key-path}))))
 
                    (ui/text " ")
 
                    ;;value
                    (-> (data->ui v {::path val-path} options)
                        (assoc-bounds idx last-idx)
-                       (merge {::ui/class "map-value"}))
+                       (merge {::ui/class "map-value" ::click-path val-path}))
 
                    ;; closing
                    (if (= idx last-idx)
@@ -557,6 +562,10 @@
   (let [val (value-at-cursor @data-atom @options-atom)]
     (alter-var-root #'trinket/x (fn [_] val))))
 
+(defn- copy-value-at-cursor! [{:keys [data-atom options-atom] :as inspector}]
+  (let [val (value-at-cursor @data-atom @options-atom)]
+    (->clipboard (pr-str val))))
+
 (defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
 (defn- is-shift-down? [^KeyEvent e] (.isShiftDown e))
 
@@ -607,6 +616,7 @@
                            (show-less! inspector (cursor inspector) @options-atom))
 
       KeyEvent/VK_D      (def-value-at-cursor! inspector)
+      KeyEvent/VK_C      (copy-value-at-cursor! inspector)
 
       ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
       ;; \0 (reset! font-size default-font-size)

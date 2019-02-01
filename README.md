@@ -80,6 +80,8 @@ changes and updating automatically.
 * <kbd>i</kbd> Index visibility toggle.
 * <kbd>d</kbd> `def` the selected part of the data as the `trinket/x`
   var.
+* <kbd>c</kbd> Copy to cliboard the `pr-str` string representation of
+  the selected data.
 * <kbd>u</kbd> Unmark.
 
 ### Marking
@@ -139,6 +141,8 @@ or
 - [ ] BUG: <d> doesn't work as expected in table cells
 - [ ] reinstate grid padding
 - [ ] Test slow lazy sequences
+- [ ] BUG: don't scroll down from last element of list of maps if
+      there is nothing to scroll to
 
 ## REPL workflows
 
