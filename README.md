@@ -138,11 +138,14 @@ or
 - [ ] turn aliases on and off
 - [ ] BUG: Top-level empty maps render as invisible
 
-- [ ] BUG: <d> doesn't work as expected in table cells
+- [ ] BUG: <kbd>d</kbd> doesn't work as expected in table cells
 - [ ] reinstate grid padding
 - [ ] Test slow lazy sequences
 - [ ] BUG: don't scroll down from last element of list of maps if
       there is nothing to scroll to
+- [ ] BUG: <kbd>left</kbd> does not jump to index 0, it jumps to index
+      1 in maps
+- [ ] BUG: collapsed vectors rendered with `(...)`
 
 ## REPL workflows
 
