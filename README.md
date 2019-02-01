@@ -34,12 +34,12 @@ Subsequently you can:
 ```
 
 In order to work with multiple inspectors, hold on to a reference of
-the record returned by `inspect`:
+the record returned by `inspector`:
 
 ``` clojure
-(def ins (t/inspect {:a [1 2 2 4]
-                     :b (range 100)
-                     :c {:c1 "foo" :c2 "bar"}}))
+(def ins (t/inspector {:a [1 2 2 4]
+                       :b (range 100)
+                       :c {:c1 "foo" :c2 "bar"}}))
 ```
 
 So that later you can refer to that particular inspector:

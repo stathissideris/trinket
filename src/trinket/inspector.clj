@@ -66,7 +66,7 @@
 (defn- indicate-lazy [ui]
   (ui/horizontal {::ui/children [(annotation "L") ui]}))
 
-(defn- truncate [s]
+(defn- truncate [^String s]
   (if (> (.length s) 100)
     (str (subs s 0 100) "...")
     s))
@@ -352,17 +352,6 @@
       .getSystemClipboard
       (.setContents (StringSelection. s) nil))
   s)
-
-(defn set-data!
-  "Sets the data of an inspector. With single arity, it sets the data of
-  the last opened inspector. Caution: If you are inspecting an atom,
-  this function will mutate your atom."
-  ([data]
-   (set-data! nil data))
-  ([inspector data]
-   (let [{:keys [data-atom]} (or inspector @last-inspector)]
-     (reset! data-atom data))
-   nil)) ;;prevent print explosion
 
 (defn- set-options!
   ([options]
@@ -655,9 +644,9 @@
 (defn- atom? [x]
   (instance? clojure.lang.Atom x)) ;;TODO make this more generic
 
-(defn inspect
+(defn inspector
   ([data]
-   (inspect data {}))
+   (inspector data {}))
   ([data options]
    (let [data-atom       (if (atom? data) data (atom data))
          options-atom    (atom (merge default-options options))
@@ -728,3 +717,23 @@
      (reset! last-inspector inspector)
 
      inspector)))
+
+(defn inspect
+  ([data]
+   (inspect data nil))
+  ([data options]
+   (inspector data options)
+   nil)) ;;prevent print explosion
+
+(defn set-data!
+  "Sets the data of an inspector. With single arity, it sets the data of
+  the last opened inspector. Caution: If you are inspecting an atom,
+  this function will mutate your atom."
+  ([data]
+   (set-data! nil data))
+  ([inspector data]
+   (let [{:keys [data-atom]} (or inspector @last-inspector)]
+     (if-not data-atom ;; inspect if not already inspecting
+       (inspect data)
+       (reset! data-atom data)))
+   nil)) ;;prevent print explosion
