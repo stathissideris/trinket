@@ -723,6 +723,7 @@
      inspector)))
 
 (defn inspect
+  "Inspect the passed data."
   ([data]
    (inspect data nil))
   ([data options]
