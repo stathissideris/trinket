@@ -23,12 +23,12 @@
 
 (defonce last-inspector (atom nil))
 
-(def default-options {::cursor        []
-                      ::expanded      #{[]}
-                      ::scale         1
-                      ::show-indexes  true
-                      ::page-length   10
-                      ::string-length 500})
+(def default-options {::cursor       []
+                      ::expanded     #{[]}
+                      ::scale        1
+                      ::show-indexes true
+                      ::limit        10
+                      ::string-limit 500})
 
 (defn- lazy? [x] (or (instance? clojure.lang.LazySeq x)
                      (instance? clojure.lang.Cons x)))
@@ -72,12 +72,12 @@
     (str (subs s 0 100) "...")
     s))
 
-(defn atom->ui [data {::ui/keys [text] :as attr} {::keys [page-length] :as options}]
+(defn atom->ui [data {::ui/keys [text] :as attr} {::keys [limit] :as options}]
   (ui/text
    (merge
     attr
     {::ui/text  (if text text
-                    (binding [*print-length* page-length]
+                    (binding [*print-length* limit]
                       (truncate (pr-str data))))
      ::ui/color (cond (keyword? data) ui/color-keywords
                       (string? data)  ui/color-strings
@@ -219,15 +219,15 @@
     (let [len (.length s)]
       (subs s (min start len) (min end len)))))
 
-(defn- data-page [data path {::keys [string-length page-length lengths offsets] :as options}]
+(defn- data-page [data path {::keys [string-limit limit limits offsets] :as options}]
   (let [offset (get offsets path 0)]
     (if (string? data)
       {:offset offset
-       :data   (safe-subs data offset (get lengths path string-length))}
+       :data   (safe-subs data offset (get limits path string-limit))}
       {:offset offset
        :data   (->> data
                     (drop offset)
-                    (take (get lengths path page-length)))})))
+                    (take (get limits path limit)))})))
 
 (defmethod data->ui :atom
   [data attr options]
@@ -530,15 +530,15 @@
     (mouseMoved [^MouseEvent e]
       (println "X:" (.getX e) "Y:" (.getY e)))))
 
-(defn- show-less! [inspector path {::keys [page-length]}]
-  (swap-options! inspector update-in [::lengths path]
+(defn- show-less! [inspector path {::keys [limit]}]
+  (swap-options! inspector update-in [::limits path]
                  (fn [x]
-                   (max 1 (dec (or x page-length))))))
+                   (max 1 (dec (or x limit))))))
 
-(defn- show-more! [inspector path {::keys [page-length]}]
-  (swap-options! inspector update-in [::lengths path]
+(defn- show-more! [inspector path {::keys [limit]}]
+  (swap-options! inspector update-in [::limits path]
                  (fn [x]
-                   (inc (or x page-length)))))
+                   (inc (or x limit)))))
 
 (defn- focused [{:keys [ui-atom] :as inspector}]
   (let [ui  @ui-atom
@@ -555,6 +555,16 @@
 (defn- copy-value-at-cursor! [{:keys [data-atom options-atom] :as inspector}]
   (let [val (value-at-cursor @data-atom @options-atom)]
     (->clipboard (pr-str val))))
+
+(defn- more-seq? [data {::keys [cursor offsets limits limit string-limit]}]
+  (let [data (path/get-in data cursor)]
+    (or (lazy? data)
+        (let [c      (count data)
+              limit  (or (get limits cursor)
+                         (if (string? data) string-limit limit))
+              offset (or (get offsets cursor) 0)]
+          (prn offset limit c)
+          (< (+ offset limit) c)))))
 
 (if (os/mac?)
   (defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
@@ -584,7 +594,8 @@
                            (scroll-seq! inspector (cursor inspector) safe-dec))
       KeyEvent/VK_PERIOD (if (is-shift-down? e)
                            (scroll-seq! inspector (cursor inspector) #(+ % 10))
-                           (scroll-seq! inspector (cursor inspector) safe-inc))
+                           (when (more-seq? @data-atom @options-atom)
+                            (scroll-seq! inspector (cursor inspector) safe-inc)))
 
       KeyEvent/VK_LEFT   (move-cursor! inspector :left)
       KeyEvent/VK_RIGHT  (move-cursor! inspector :right)

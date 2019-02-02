@@ -128,7 +128,7 @@ or
       count
 - [ ] Turn keyword namespaces on and off
 - [ ] Sorting
-- [ ] BUG: can't go to parent of single-element sequence
+- [x] BUG: can't go to parent of single-element sequence
 - [ ] Apply spec to data structure and render problematic
       sub-structures/values
 - [ ] datafy/nav
@@ -146,6 +146,8 @@ or
 - [ ] BUG: <kbd>left</kbd> does not jump to index 0, it jumps to index
       1 in maps
 - [ ] BUG: collapsed vectors rendered with `(...)`
+- [ ] Make coll scrolling and show less/more forgiving so that it
+      scrolls parent if element of collection is highlighted.
 
 ## REPL workflows
 
