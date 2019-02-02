@@ -5,6 +5,7 @@
             [trinket.alias :as alias]
             ;;[trinket.perf :as perf]
             [trinket.util :refer [cfuture]]
+            [trinket.os :as os]
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
@@ -555,7 +556,10 @@
   (let [val (value-at-cursor @data-atom @options-atom)]
     (->clipboard (pr-str val))))
 
-(defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
+(if (os/mac?)
+  (defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
+  (defn- is-shortcut-down? [^KeyEvent e] (.isAltDown e)))
+
 (defn- is-shift-down? [^KeyEvent e] (.isShiftDown e))
 
 (defn- key-pressed [{:keys [data-atom ui-atom options-atom] :as inspector} ^KeyEvent e]
