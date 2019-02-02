@@ -2,11 +2,28 @@
   (:require [clojure.zip :as zip]
             ;;[trinket.perf :as perf]
             )
-  (:import [java.awt Graphics2D Color Font Rectangle RenderingHints]
+  (:import [java.awt Graphics2D Color Font Rectangle RenderingHints GraphicsEnvironment]
            [javax.swing SwingUtilities JComponent JLabel]))
 
+
+(def available-font-families
+  (fn []
+    (conj
+     (set (.getAvailableFontFamilyNames (GraphicsEnvironment/getLocalGraphicsEnvironment)))
+     "monospaced")))
+
+(defn available-font-family? [family]
+  (get (available-font-families) family))
+
 (def default-font-size 11)
-(def font-size (atom default-font-size))
+
+(defn font [{::keys [family style size]
+             :or    {style Font/PLAIN
+                     size  default-font-size}}]
+  (if (string? family)
+    (Font. family style size)
+    ;; if passed a sequence, select first available font
+    (Font. (some available-font-family? family) style size)))
 
 (def color-selection-background (-> (Color/decode "0x5ab2ec")
                                     .darker
@@ -18,8 +35,8 @@
 (def color-keywords (Color/decode "0xa8a4de"))
 (def color-strings (Color/decode "0x9bbc68")) ;;and namespaces too
 
-(def font-mono (Font. "Monaco" Font/PLAIN default-font-size))
-(def font-regular (Font. "Lucinda Grande" Font/PLAIN default-font-size))
+(def font-mono (font {::family ["Monaco" "Consolas" "DejaVu Sans Mono" "Book" "monospaced"]}))
+(def font-regular (font {::family "Lucinda Grande"}))
 
 (defmacro later [& exprs]
   `(SwingUtilities/invokeLater (fn [] ~@exprs)))

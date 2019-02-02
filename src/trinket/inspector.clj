@@ -611,10 +611,6 @@
       KeyEvent/VK_D      (def-value-at-cursor! inspector)
       KeyEvent/VK_C      (copy-value-at-cursor! inspector)
 
-      ;;\c (-> tree .getSelectionModel .getSelectionPath .getLastPathComponent pr-str ->clipboard println)
-      ;; \0 (reset! font-size default-font-size)
-      ;; \= (swap! font-size inc)
-      ;; \- (swap! font-size dec)
       nil)))
 
 (defn key-listener [inspector]
