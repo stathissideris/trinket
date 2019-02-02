@@ -420,7 +420,16 @@
   (when-let [parent-path (path/up path)]
     (ui/find-component ui #(= parent-path (::path %)))))
 
-(defn- move-cursor! [{:keys [ui-atom options-atom] :as inspector} direction]
+(defn- rem-seq [data {::keys [cursor offsets limits limit string-limit]}]
+  (let [data (path/get-in data cursor)]
+    (or (lazy? data)
+        (let [c      (count data)
+              limit  (or (get limits cursor)
+                         (if (string? data) string-limit limit))
+              offset (or (get offsets cursor) 0)]
+          (- c (+ offset limit))))))
+
+(defn- move-cursor! [{:keys [data-atom ui-atom options-atom] :as inspector} direction]
   (let [ui       @ui-atom
         options  @options-atom
         cur      (cursor inspector)
@@ -476,9 +485,11 @@
 
       ;; down to go to next key or value
       (= :down direction)
-      (do ;; make purer
-        (when (::last cur-comp) (scroll-seq! inspector (path/up cur) safe-inc))
-        (swap-options! inspector update ::cursor path/right))
+      (let [more? (< 0 (rem-seq @data-atom (update options ::cursor path/up)))]
+        (when (and (::last cur-comp) more?)
+          (scroll-seq! inspector (path/up cur) safe-inc))
+        (when (not (::last cur-comp))
+          (swap-options! inspector update ::cursor path/right)))
 
       ;; left to get out of structure
       (and (#{:left :up} direction) (::first cur-comp))
@@ -555,15 +566,6 @@
 (defn- copy-value-at-cursor! [{:keys [data-atom options-atom] :as inspector}]
   (let [val (value-at-cursor @data-atom @options-atom)]
     (->clipboard (pr-str val))))
-
-(defn- rem-seq [data {::keys [cursor offsets limits limit string-limit]}]
-  (let [data (path/get-in data cursor)]
-    (or (lazy? data)
-        (let [c      (count data)
-              limit  (or (get limits cursor)
-                         (if (string? data) string-limit limit))
-              offset (or (get offsets cursor) 0)]
-          (- c (+ offset limit))))))
 
 (if (os/mac?)
   (defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
