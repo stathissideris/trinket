@@ -730,6 +730,9 @@
    (inspector data options)
    nil)) ;;prevent print explosion
 
+(defn- ^JFrame last-frame []
+  (:frame @last-inspector))
+
 (defn set-data!
   "Sets the data of an inspector. With single arity, it sets the data of
   the last opened inspector. Caution: If you are inspecting an atom,
@@ -738,7 +741,17 @@
    (set-data! nil data))
   ([inspector data]
    (let [{:keys [data-atom]} (or inspector @last-inspector)]
-     (if-not data-atom ;; inspect if not already inspecting
-       (inspect data)
-       (reset! data-atom data)))
+     (cond (not data-atom) ;; inspect if not already inspecting
+           (do
+             (dbg "Wasn't inspecting, opening new window")
+             (inspect data))
+
+           (and (not inspector)
+                (not (.isVisible (last-frame))))
+           (do (dbg "Reusing closed inspector window")
+               (reset! data-atom data)
+               (.setVisible (last-frame) true))
+
+           :else
+           (reset! data-atom data)))
    nil)) ;;prevent print explosion
