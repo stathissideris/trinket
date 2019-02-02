@@ -556,15 +556,14 @@
   (let [val (value-at-cursor @data-atom @options-atom)]
     (->clipboard (pr-str val))))
 
-(defn- more-seq? [data {::keys [cursor offsets limits limit string-limit]}]
+(defn- rem-seq [data {::keys [cursor offsets limits limit string-limit]}]
   (let [data (path/get-in data cursor)]
     (or (lazy? data)
         (let [c      (count data)
               limit  (or (get limits cursor)
                          (if (string? data) string-limit limit))
               offset (or (get offsets cursor) 0)]
-          (prn offset limit c)
-          (< (+ offset limit) c)))))
+          (- c (+ offset limit))))))
 
 (if (os/mac?)
   (defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
@@ -593,9 +592,10 @@
                            (scroll-seq! inspector (cursor inspector) #(max 0 (- % 10)))
                            (scroll-seq! inspector (cursor inspector) safe-dec))
       KeyEvent/VK_PERIOD (if (is-shift-down? e)
-                           (scroll-seq! inspector (cursor inspector) #(+ % 10))
-                           (when (more-seq? @data-atom @options-atom)
-                            (scroll-seq! inspector (cursor inspector) safe-inc)))
+                           (let [rem (rem-seq @data-atom @options-atom)]
+                             (scroll-seq! inspector (cursor inspector) #(+ % (min rem 10))))
+                           (when (< 0 (rem-seq @data-atom @options-atom))
+                             (scroll-seq! inspector (cursor inspector) safe-inc)))
 
       KeyEvent/VK_LEFT   (move-cursor! inspector :left)
       KeyEvent/VK_RIGHT  (move-cursor! inspector :right)
