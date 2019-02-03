@@ -77,12 +77,12 @@
       (str/replace-first "(" "[")
       (str/replace #"\)$" "]")))
 
-(defn atom->ui [data {::ui/keys [text] :as attr ::keys [vector]} {::keys [limit] :as options}]
+(defn atom->ui [data {::ui/keys [text] :as attr ::keys [vector]} {::keys [cursor limit limits] :as options}]
   (ui/text
    (merge
     attr
     {::ui/text  (if text text
-                    (binding [*print-length* limit]
+                    (binding [*print-length* (or (get limits cursor) limit)]
                       (truncate (if vector
                                   (pr-vector data)
                                   (pr-str data)))))
