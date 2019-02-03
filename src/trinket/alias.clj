@@ -35,6 +35,8 @@
         (make-fragment-aliases nss))))
 
 (defn shorten [k aliases]
-  (if-let [a (get aliases (namespace k))]
-    (str "::" a "/" (name k))
-    (str k)))
+  (if (string? k)
+    k
+    (if-let [a (get aliases (namespace k))]
+      (str "::" a "/" (name k))
+      (str k))))

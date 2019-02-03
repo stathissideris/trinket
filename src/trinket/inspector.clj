@@ -134,7 +134,11 @@
 
 (defn- data-table [data {::keys [path lazy length offset] :as attr} options]
   (let [t-keys   (total-keys data)
-        nss      (distinct (remove nil? (map namespace t-keys)))
+        nss      (->> t-keys
+                      (filter keyword?)
+                      (map namespace)
+                      (remove nil?)
+                      (distinct))
         aliases  (alias/make-aliases nss)
         last-idx (dec (count data))]
     (ui/vertical
