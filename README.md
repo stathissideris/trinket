@@ -144,8 +144,8 @@ or
 - [ ] BUG: don't scroll down from last element of list of maps if
       there is nothing to scroll to
 - [ ] BUG: <kbd>left</kbd> does not jump to index 0, it jumps to index
-      1 in maps
-- [ ] BUG: collapsed vectors rendered with `(...)`
+      1 in maps (unable to reproduce)
+- [x] BUG: collapsed vectors rendered with `(...)`
 - [ ] Make coll scrolling and show less/more forgiving so that it
       scrolls parent if element of collection is highlighted.
 

@@ -72,13 +72,20 @@
     (str (subs s 0 100) "...")
     s))
 
-(defn atom->ui [data {::ui/keys [text] :as attr} {::keys [limit] :as options}]
+(defn pr-vector [x]
+  (-> x pr-str
+      (str/replace-first "(" "[")
+      (str/replace #"\)$" "]")))
+
+(defn atom->ui [data {::ui/keys [text] :as attr ::keys [vector]} {::keys [limit] :as options}]
   (ui/text
    (merge
     attr
     {::ui/text  (if text text
                     (binding [*print-length* limit]
-                      (truncate (pr-str data))))
+                      (truncate (if vector
+                                  (pr-vector data)
+                                  (pr-str data)))))
      ::ui/color (cond (keyword? data) ui/color-keywords
                       (string? data)  ui/color-strings
                       :else           ui/color-text)
@@ -250,6 +257,7 @@
   (let [{:keys [data offset]} (data-page all-data path options)]
     (sequential->ui data
                     (assoc attr
+                           ::vector true
                            ::length (count all-data)
                            ::offset offset
                            ::opening "["
