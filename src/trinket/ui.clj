@@ -189,11 +189,11 @@
     0
     (apply max (remove nil? coll))))
 
-(defn- position-in-rect [{cw ::w
-                          ch ::h
+(defn- position-in-rect [{cw        ::w
+                          ch        ::h
                           alignment ::alignment
-                          :as component
-                          :or {alignment "nw"}}
+                          :as       component
+                          :or       {alignment "nw"}}
                          {rx ::x
                           ry ::y
                           rw ::w
