@@ -31,7 +31,8 @@
                       ::string-limit 500})
 
 (defn- lazy? [x] (or (instance? clojure.lang.LazySeq x)
-                     (instance? clojure.lang.Cons x)))
+                     (instance? clojure.lang.Cons x)
+                     (instance? clojure.lang.LongRange x)))
 
 (defn collection-tag [x]
   (cond
@@ -421,6 +422,7 @@
   (max 0 ((fnil dec 0) x)))
 
 (def safe-inc (fnil inc 0))
+(def safe+ (fnil + 0))
 
 (defn- scroll-seq! [inspector path fun]
   (swap-options! inspector update-in [::offsets path] fun))
@@ -432,14 +434,17 @@
   (when-let [parent-path (path/up path)]
     (ui/find-component ui #(= parent-path (::path %)))))
 
-(defn- rem-seq [data {::keys [cursor offsets limits limit string-limit]}]
-  (let [data (path/get-in data cursor)]
-    (or (lazy? data)
-        (let [c      (count data)
-              limit  (or (get limits cursor)
-                         (if (string? data) string-limit limit))
-              offset (or (get offsets cursor) 0)]
-          (- c (+ offset limit))))))
+(defn- allowed-step* [data step offset limit]
+  (if (> limit (->> data (drop (+ offset step)) (take limit) count)) ;;TODO realization here, what about slow ones?
+    0
+    step))
+
+(defn- allowed-step [data step {::keys [cursor offsets limits limit string-limit]}]
+  (let [data   (path/get-in data cursor)
+        limit  (or (get limits cursor)
+                   (if (string? data) string-limit limit))
+        offset (or (get offsets cursor) 0)]
+    (allowed-step* data step offset limit)))
 
 (defn- move-cursor! [{:keys [data-atom ui-atom options-atom] :as inspector} direction]
   (let [ui       @ui-atom
@@ -497,11 +502,12 @@
 
       ;; down to go to next key or value
       (= :down direction)
-      (let [more? (< 0 (rem-seq @data-atom (update options ::cursor path/up)))]
-        (when (and (::last cur-comp) more?)
-          (scroll-seq! inspector (path/up cur) safe-inc))
-        (when (not (::last cur-comp))
-          (swap-options! inspector update ::cursor path/right)))
+      (do
+       (when (::last cur-comp)
+         (if (< 0 (allowed-step @data-atom 1 (update options ::cursor path/up)))
+           (scroll-seq! inspector (path/up cur) safe-inc)))
+       (when (not (::last cur-comp))
+         (swap-options! inspector update ::cursor path/right)))
 
       ;; left to get out of structure
       (and (#{:left :up} direction) (::first cur-comp))
@@ -605,11 +611,8 @@
       KeyEvent/VK_COMMA  (if (is-shift-down? e)
                            (scroll-seq! inspector (cursor inspector) #(max 0 (- % 10)))
                            (scroll-seq! inspector (cursor inspector) safe-dec))
-      KeyEvent/VK_PERIOD (if (is-shift-down? e)
-                           (let [rem (rem-seq @data-atom @options-atom)]
-                             (scroll-seq! inspector (cursor inspector) #(+ % (min rem 10))))
-                           (when (< 0 (rem-seq @data-atom @options-atom))
-                             (scroll-seq! inspector (cursor inspector) safe-inc)))
+      KeyEvent/VK_PERIOD (let [step (allowed-step @data-atom (if (is-shift-down? e) 10 1) @options-atom)]
+                           (scroll-seq! inspector (cursor inspector) #(safe+ % step)))
 
       KeyEvent/VK_LEFT   (move-cursor! inspector :left)
       KeyEvent/VK_RIGHT  (move-cursor! inspector :right)
