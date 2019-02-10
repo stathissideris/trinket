@@ -6,6 +6,7 @@
             ;;[trinket.perf :as perf]
             [trinket.util :refer [cfuture]]
             [trinket.keys :as keys]
+            [trinket.mouse :as mouse]
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
@@ -545,19 +546,9 @@
           (toggle-expansion! inspector (::click-path match)))
       nil)))
 
-(defn- mouse-moved [inspector e keyboard-atom]
+(defn- mouse-moved [inspector keyboard-atom e]
   (when (keys/pressed? @keyboard-atom :space)
     (prn "Scrolling!")))
-
-(defn mouse-listener [{:keys [ui-atom] :as inspector} keyboard-atom]
-  (proxy [MouseListener MouseMotionListener] []
-    (mouseClicked [e] (#'mouse-clicked inspector e))
-    (mouseEntered [e])
-    (mouseExited [e])
-    (mousePressed [e])
-    (mouseReleased [e])
-    (mouseDragged [e])
-    (mouseMoved [e] (#'mouse-moved inspector e keyboard-atom))))
 
 (defn mouse-position-printer []
   (proxy [MouseMotionListener] []
@@ -609,10 +600,10 @@
                                    (disj tables path)
                                    (conj tables path)))))
 
-      :comma  (if (keys/is-shift-down? e)
+      :comma  (if (:shift e)
                 (scroll-seq! inspector (cursor inspector) #(max 0 (- % 10)))
                 (scroll-seq! inspector (cursor inspector) safe-dec))
-      :period (let [step (allowed-step @data-atom (if (keys/is-shift-down? e) 10 1) @options-atom)]
+      :period (let [step (allowed-step @data-atom (if (:shift e) 10 1) @options-atom)]
                 (scroll-seq! inspector (cursor inspector) #(safe+ % step)))
 
       :left   (move-cursor! inspector :left)
@@ -622,18 +613,18 @@
 
       :u      (unmark! inspector)
       :i      (swap-options! inspector update ::show-indexes not)
-      :f      (if (keys/is-shift-down? e)
+      :f      (if (:shift e)
                 (swap-options! inspector assoc ::focus [])
                 (swap-options! inspector #(-> %
                                               (assoc ::focus cur)
                                               (assoc ::cursor []))))
 
-      :0      (when (keys/is-shortcut-down? e)
+      :0      (when (:shortcut e)
                 (swap-options! inspector update ::scale (constantly 1)))
-      :equals (if (keys/is-shortcut-down? e)
+      :equals (if (:shortcut e)
                 (swap-options! inspector update ::scale #(+ % 0.1))
                 (show-more! inspector (cursor inspector) @options-atom))
-      :minus  (if (keys/is-shortcut-down? e)
+      :minus  (if (:shortcut e)
                 (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
                 (show-less! inspector (cursor inspector) @options-atom))
 
@@ -698,6 +689,13 @@
   (let [^JScrollPane sp (-> inspector :frame .getContentPane .getComponents first)]
     (-> sp .getVerticalScrollBar (.setValue y))
     (-> sp .getHorizontalScrollBar (.setValue x))))
+
+(defn- scroll-by! [inspector [x y]]
+  (let [^JScrollPane sp (-> inspector :frame .getContentPane .getComponents first)
+        hor             (.getHorizontalScrollBar sp)
+        ver             (.getVerticalScrollBar sp)]
+    (.setValue hor (+ x (.getValue hor)))
+    (.setValue ver (+ y (.getValue ver)))))
 
 (defn inspector
   ([data]
@@ -764,17 +762,23 @@
 
      ;;listeners
      (let [{:keys [key-listener key-atom]}
-           (keys/key-listener {:pressed  (partial key-pressed inspector)
-                               :released (partial key-released inspector)})]
+           (keys/listener {:pressed  (partial key-pressed inspector)
+                           :released (partial key-released inspector)})]
        (doto frame
          (.setFocusTraversalKeysEnabled false) ;; so that <TAB> can be detected
          (.addKeyListener key-listener)
          (.setVisible true))
-       (let [ml (mouse-listener inspector key-atom)]
+       (let [ml (mouse/listener
+                 {:clicked     (partial mouse-clicked inspector)
+                  :moved       (partial mouse-moved inspector key-atom)
+                  :wheel-moved (fn [e]
+                                 (prn (.getWheelRotation e))
+                                 (scroll-by! inspector [0 (* 10 (.getWheelRotation e))]))})]
          (doto panel
            (.setBorder (BorderFactory/createEmptyBorder))
            (.addMouseListener ml)
            (.addMouseMotionListener ml)
+           (.addMouseWheelListener ml)
            ;;(.addMouseMotionListener (mouse-position-printer))
            )))
 

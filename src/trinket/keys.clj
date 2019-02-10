@@ -34,7 +34,7 @@
    :alt      (.isAltDown e)})
 
 
-(defn key-listener [{:keys [pressed released typed]}]
+(defn listener [{:keys [pressed released typed]}]
   (let [state (atom {:pressed #{}
                      :history []})]
     {:key-atom     state
