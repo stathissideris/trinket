@@ -651,7 +651,7 @@
       ui/add-absolute-coords))
 
 (defn- trigger-repaint [{::ui/keys [w h] :as new-ui} scale ^JPanel panel ^JFrame frame]
-  (.setPreferredSize panel (Dimension. (+ 10 (* scale w)) (+ 10 (* scale h))))
+  ;;(.setPreferredSize panel (Dimension. (+ 10 (* scale w)) (+ 10 (* scale h))))
   ;;(.revalidate panel)
   (.repaint frame))
 
@@ -663,14 +663,10 @@
 (defn- atom? [x]
   (instance? clojure.lang.Atom x)) ;;TODO make this more generic
 
-(defn- paint-scrollbars! [^JPanel panel ^JScrollPane sp ^Graphics2D g]
+(defn- paint-scrollbars! [^JScrollPane sp [pw ph] ^Graphics2D g]
   (let [vp  (.getViewport sp)
         vw  (.getWidth vp)
         vh  (.getHeight vp)
-
-        pw  (.getWidth panel)
-        ph  (.getHeight panel)
-
         hor (-> sp .getHorizontalScrollBar .getValue)
         ver (-> sp .getVerticalScrollBar .getValue)]
     ;;horizonal scrollbar
@@ -709,16 +705,17 @@
          ^JPanel panel   (proxy [JPanel] []
                            (paintComponent [^Graphics2D g]
                              (try
-                               (let [ui              @ui-atom
-                                     scale           (::scale @options-atom)
-                                     f               scale
-                                     ^JScrollPane sp @sp
-                                     scroll-pos      (-> sp .getViewport .getViewPosition)
-                                     sx              (.-x scroll-pos)
-                                     sy              (.-y scroll-pos)
-                                     view-size       (-> sp .getViewport .getViewSize)
-                                     vw              (.-width view-size)
-                                     vh              (.-height view-size)]
+                               (let [{::ui/keys [w h] :as ui} @ui-atom
+                                     scale                    (::scale @options-atom)
+                                     f                        scale
+                                     ^JScrollPane sp          @sp
+                                     scroll-pos               (-> sp .getViewport .getViewPosition)
+                                     sx                       (.-x scroll-pos)
+                                     sy                       (.-y scroll-pos)
+                                     view-size                (-> sp .getViewport .getViewSize)
+                                     vw                       (.-width view-size)
+                                     vh                       (.-height view-size)]
+                                 (.setPreferredSize this (Dimension. (+ 10 (* scale w)) (+ 10 (* scale h))))
                                  (doto g
                                    (.setClip (- sx 2) (- sy 2) (+ 10 vw) (+ 10 vh))
                                    (.scale f f)
@@ -729,7 +726,7 @@
                                  (#'paint-cursor! ui (::cursor @options-atom) g)
                                  (ui/paint! ui g)
                                  (.scale g 1 1)
-                                 (paint-scrollbars! this sp g))
+                                 (paint-scrollbars! sp [w h] g))
                                (catch Exception e
                                  (.printStackTrace e)))))
          ^JScrollPane sp (reset! sp (doto (JScrollPane. panel)
@@ -784,7 +781,7 @@
      (reset! last-inspector inspector)
 
      ;; to initialize preferred size
-     (trigger-repaint @ui-atom (::scale @options-atom) panel frame)
+     ;;(trigger-repaint @ui-atom (::scale @options-atom) panel frame)
 
      inspector)))
 
