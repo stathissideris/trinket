@@ -11,7 +11,7 @@
             [clojure.string :as str]
             [clojure.zip :as zip])
   (:import [java.awt Toolkit Graphics2D Dimension Cursor]
-           [java.awt.event KeyListener KeyEvent MouseListener MouseMotionListener MouseEvent]
+           [java.awt.event KeyListener KeyEvent MouseListener MouseMotionListener MouseEvent MouseWheelEvent]
            [java.awt.datatransfer StringSelection]
            [javax.swing JPanel JFrame JScrollPane JScrollBar BorderFactory]))
 
@@ -24,12 +24,13 @@
 
 (defonce last-inspector (atom nil))
 
-(def default-options {::cursor       []
-                      ::expanded     #{[]}
-                      ::scale        1
-                      ::show-indexes true
-                      ::limit        10
-                      ::string-limit 500})
+(def default-options {::cursor        []
+                      ::expanded      #{[]}
+                      ::scale         1
+                      ::show-indexes  true
+                      ::limit         10
+                      ::string-limit  500
+                      ::view-position {:x 0 :y 0}})
 
 (defn- lazy? [x] (or (instance? clojure.lang.LazySeq x)
                      (instance? clojure.lang.Cons x)
@@ -650,11 +651,6 @@
       ui/layout
       ui/add-absolute-coords))
 
-(defn- trigger-repaint [{::ui/keys [w h] :as new-ui} scale ^JPanel panel ^JFrame frame]
-  ;;(.setPreferredSize panel (Dimension. (+ 10 (* scale w)) (+ 10 (* scale h))))
-  ;;(.revalidate panel)
-  (.repaint frame))
-
 (defn- only-diff? [old new k]
   (and (not= (get old k) (get new k))
        (= (dissoc old k)
@@ -715,7 +711,7 @@
                                      view-size                (-> sp .getViewport .getViewSize)
                                      vw                       (.-width view-size)
                                      vh                       (.-height view-size)]
-                                 (.setPreferredSize this (Dimension. (+ 10 (* scale w)) (+ 10 (* scale h))))
+                                 (.setPreferredSize ^JPanel this (Dimension. (+ 10 (* scale w)) (+ 10 (* scale h))))
                                  (doto g
                                    (.setClip (- sx 2) (- sy 2) (+ 10 vw) (+ 10 vh))
                                    (.scale f f)
@@ -747,16 +743,16 @@
                     (cfuture
                      (let [new-ui (make-new-ui data options)]
                        (reset! ui-atom new-ui)
-                       (ui/later (trigger-repaint new-ui scale panel frame)))))))
+                       (ui/later (.repaint frame)))))))
 
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ old-options {::keys [scale] :as options}]
                   (cfuture
                    (if (only-diff? old-options options ::cursor)
-                     (ui/later (trigger-repaint @ui-atom scale panel frame))
+                     (ui/later (.repaint frame))
                      (let [new-ui (make-new-ui @data-atom options)]
                        (reset! ui-atom new-ui)
-                       (ui/later (trigger-repaint new-ui scale panel frame)))))))
+                       (ui/later (.repaint frame)))))))
 
      ;;listeners
      (let [{:keys [key-listener key-atom]}
@@ -769,7 +765,7 @@
        (let [ml (mouse/listener
                  {:clicked     (partial mouse-clicked inspector)
                   :moved       (partial mouse-moved inspector key-atom)
-                  :wheel-moved #(scroll-by! inspector [0 (* 15 (.getWheelRotation %))])})]
+                  :wheel-moved #(scroll-by! inspector [0 (* 15 (.getWheelRotation ^MouseWheelEvent %))])})]
          (doto panel
            (.setBorder (BorderFactory/createEmptyBorder))
            (.addMouseListener ml)
