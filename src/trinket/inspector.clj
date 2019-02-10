@@ -679,23 +679,24 @@
 
     ;;vertical scrollbar
     (when (> ph vh)
-      (let [x (- vw 10)
-            y (* 2 ver)
-            w 10
-            h (* vh (/ vh ph))]
+      (let [w 10
+            h (* vh (/ vh ph))
+            x (- vw w)
+            y (+ ver (* vh (/ ver ph)))]
         (.fillRect g x y w h)))))
 
-(defn- scroll-to! [inspector [x y]]
-  (let [^JScrollPane sp (-> inspector :frame .getContentPane .getComponents first)]
-    (-> sp .getVerticalScrollBar (.setValue y))
-    (-> sp .getHorizontalScrollBar (.setValue x))))
+(defn- scroll-to! [{:keys [frame] :as inspector} [x y]]
+  (let [vp (-> frame .getContentPane .getComponents first .getViewport)]
+    (.setViewPosition vp (ui/point (max 0 x) (max 0 y)))
+    (.repaint frame)))
 
-(defn- scroll-by! [inspector [x y]]
-  (let [^JScrollPane sp (-> inspector :frame .getContentPane .getComponents first)
-        hor             (.getHorizontalScrollBar sp)
-        ver             (.getVerticalScrollBar sp)]
-    (.setValue hor (+ x (.getValue hor)))
-    (.setValue ver (+ y (.getValue ver)))))
+(defn- scroll-by! [{:keys [frame] :as inspector} [dx dy]]
+  (let [vp (-> frame .getContentPane .getComponents first .getViewport)
+        p  (.getViewPosition vp)
+        cx (.getX p)
+        cy (.getY p)]
+    (.setViewPosition vp (ui/point (max 0 (+ cx dx)) (max 0 (+ cy dy))))
+    (.repaint frame)))
 
 (defn inspector
   ([data]
@@ -771,9 +772,7 @@
        (let [ml (mouse/listener
                  {:clicked     (partial mouse-clicked inspector)
                   :moved       (partial mouse-moved inspector key-atom)
-                  :wheel-moved (fn [e]
-                                 (prn (.getWheelRotation e))
-                                 (scroll-by! inspector [0 (* 10 (.getWheelRotation e))]))})]
+                  :wheel-moved #(scroll-by! inspector [0 (* 15 (.getWheelRotation %))])})]
          (doto panel
            (.setBorder (BorderFactory/createEmptyBorder))
            (.addMouseListener ml)
@@ -783,6 +782,9 @@
            )))
 
      (reset! last-inspector inspector)
+
+     ;; to initialize preferred size
+     (trigger-repaint @ui-atom (:scale @options-atom) panel frame)
 
      inspector)))
 

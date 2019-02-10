@@ -3,7 +3,8 @@
             ;;[trinket.perf :as perf]
             )
   (:import [java.awt Graphics2D Color Font Rectangle RenderingHints GraphicsEnvironment]
-           [javax.swing SwingUtilities JComponent JLabel]))
+           [javax.swing SwingUtilities JComponent JLabel]
+           [java.awt Point]))
 
 
 (def available-font-families
@@ -47,6 +48,9 @@
       (fn []
         (deliver promise# (do ~@exprs))))
      promise#))
+
+(defn point [x y]
+  (Point. x y))
 
 (defmacro save-transform [g & body]
   `(let [g#  ~g
