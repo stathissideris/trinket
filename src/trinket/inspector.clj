@@ -784,7 +784,7 @@
      (reset! last-inspector inspector)
 
      ;; to initialize preferred size
-     (trigger-repaint @ui-atom (:scale @options-atom) panel frame)
+     (trigger-repaint @ui-atom (::scale @options-atom) panel frame)
 
      inspector)))
 
