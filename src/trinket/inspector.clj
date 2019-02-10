@@ -5,11 +5,11 @@
             [trinket.alias :as alias]
             ;;[trinket.perf :as perf]
             [trinket.util :refer [cfuture]]
-            [trinket.os :as os]
+            [trinket.keys :as keys]
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [clojure.zip :as zip])
-  (:import [java.awt Toolkit Graphics2D Dimension]
+  (:import [java.awt Toolkit Graphics2D Dimension Cursor]
            [java.awt.event KeyListener KeyEvent MouseListener MouseMotionListener MouseEvent]
            [java.awt.datatransfer StringSelection]
            [javax.swing JPanel JFrame JScrollPane JScrollBar BorderFactory]))
@@ -351,7 +351,7 @@
                          (merge {::click-path path ::ui/alignment "sw" ::ui/class "closing-brace"}))
                      (ui/text " "))]})))})]})))))
 
-(defn paint-cursor [ui path ^Graphics2D g]
+(defn paint-cursor! [ui path ^Graphics2D g]
   (when-let [match (ui/find-component ui #(= path (::path %)))]
     (let [cursor (ui/grow-bounds match 1)]
       (doto g
@@ -545,13 +545,19 @@
           (toggle-expansion! inspector (::click-path match)))
       nil)))
 
-(defn mouse-listener [{:keys [ui-atom] :as inspector}]
-  (proxy [MouseListener] []
+(defn- mouse-moved [inspector e keyboard-atom]
+  (when (keys/pressed? @keyboard-atom :space)
+    (prn "Scrolling!")))
+
+(defn mouse-listener [{:keys [ui-atom] :as inspector} keyboard-atom]
+  (proxy [MouseListener MouseMotionListener] []
     (mouseClicked [e] (#'mouse-clicked inspector e))
     (mouseEntered [e])
     (mouseExited [e])
     (mousePressed [e])
-    (mouseReleased [e])))
+    (mouseReleased [e])
+    (mouseDragged [e])
+    (mouseMoved [e] (#'mouse-moved inspector e keyboard-atom))))
 
 (defn mouse-position-printer []
   (proxy [MouseMotionListener] []
@@ -585,67 +591,61 @@
   (let [val (value-at-cursor @data-atom @options-atom)]
     (->clipboard (pr-str val))))
 
-(if (os/mac?)
-  (defn- is-shortcut-down? [^KeyEvent e] (.isMetaDown e))
-  (defn- is-shortcut-down? [^KeyEvent e] (.isAltDown e)))
-
-(defn- is-shift-down? [^KeyEvent e] (.isShiftDown e))
-
-(defn- key-pressed [{:keys [data-atom ui-atom options-atom] :as inspector} ^KeyEvent e]
+(defn- key-pressed [{:keys [data-atom ui-atom options-atom ^JFrame frame] :as inspector} e]
   (let [cur       (cursor inspector)
         expand-fn (fn []
                     (when-not (= :atom (::tag (ui/find-component @ui-atom #(= cur (::path %)))))
                       (toggle-expansion! inspector (cursor inspector))))]
-    (condp = (.getKeyCode e)
-      KeyEvent/VK_TAB    (expand-fn)
-      KeyEvent/VK_ENTER  (move-cursor! inspector :in)
+    (condp = (:code e)
+      :space  (.setCursor frame (Cursor/HAND_CURSOR))
+      :tab    (expand-fn)
+      :enter  (move-cursor! inspector :in)
 
-      KeyEvent/VK_T      (swap-options! inspector update ::tables
-                                        (fn [tables]
-                                          (let [path   (cursor inspector)
-                                                tables (or tables #{})]
-                                            (if (get tables path)
-                                              (disj tables path)
-                                              (conj tables path)))))
+      :t      (swap-options! inspector update ::tables
+                             (fn [tables]
+                               (let [path   (cursor inspector)
+                                     tables (or tables #{})]
+                                 (if (get tables path)
+                                   (disj tables path)
+                                   (conj tables path)))))
 
-      KeyEvent/VK_COMMA  (if (is-shift-down? e)
-                           (scroll-seq! inspector (cursor inspector) #(max 0 (- % 10)))
-                           (scroll-seq! inspector (cursor inspector) safe-dec))
-      KeyEvent/VK_PERIOD (let [step (allowed-step @data-atom (if (is-shift-down? e) 10 1) @options-atom)]
-                           (scroll-seq! inspector (cursor inspector) #(safe+ % step)))
+      :comma  (if (keys/is-shift-down? e)
+                (scroll-seq! inspector (cursor inspector) #(max 0 (- % 10)))
+                (scroll-seq! inspector (cursor inspector) safe-dec))
+      :period (let [step (allowed-step @data-atom (if (keys/is-shift-down? e) 10 1) @options-atom)]
+                (scroll-seq! inspector (cursor inspector) #(safe+ % step)))
 
-      KeyEvent/VK_LEFT   (move-cursor! inspector :left)
-      KeyEvent/VK_RIGHT  (move-cursor! inspector :right)
-      KeyEvent/VK_UP     (move-cursor! inspector :up)
-      KeyEvent/VK_DOWN   (move-cursor! inspector :down)
+      :left   (move-cursor! inspector :left)
+      :right  (move-cursor! inspector :right)
+      :up     (move-cursor! inspector :up)
+      :down   (move-cursor! inspector :down)
 
-      KeyEvent/VK_U      (unmark! inspector)
-      KeyEvent/VK_I      (swap-options! inspector update ::show-indexes not)
-      KeyEvent/VK_F      (if (is-shift-down? e)
-                           (swap-options! inspector assoc ::focus [])
-                           (swap-options! inspector #(-> %
-                                                         (assoc ::focus cur)
-                                                         (assoc ::cursor []))))
+      :u      (unmark! inspector)
+      :i      (swap-options! inspector update ::show-indexes not)
+      :f      (if (keys/is-shift-down? e)
+                (swap-options! inspector assoc ::focus [])
+                (swap-options! inspector #(-> %
+                                              (assoc ::focus cur)
+                                              (assoc ::cursor []))))
 
-      KeyEvent/VK_0      (when (is-shortcut-down? e)
-                           (swap-options! inspector update ::scale (constantly 1)))
-      KeyEvent/VK_EQUALS (if (is-shortcut-down? e)
-                           (swap-options! inspector update ::scale #(+ % 0.1))
-                           (show-more! inspector (cursor inspector) @options-atom))
-      KeyEvent/VK_MINUS  (if (is-shortcut-down? e)
-                           (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
-                           (show-less! inspector (cursor inspector) @options-atom))
+      :0      (when (keys/is-shortcut-down? e)
+                (swap-options! inspector update ::scale (constantly 1)))
+      :equals (if (keys/is-shortcut-down? e)
+                (swap-options! inspector update ::scale #(+ % 0.1))
+                (show-more! inspector (cursor inspector) @options-atom))
+      :minus  (if (keys/is-shortcut-down? e)
+                (swap-options! inspector update ::scale #(let [s (- % 0.1)] (if (< s 0.6) 0.6 s)))
+                (show-less! inspector (cursor inspector) @options-atom))
 
-      KeyEvent/VK_D      (def-value-at-cursor! inspector)
-      KeyEvent/VK_C      (copy-value-at-cursor! inspector)
+      :d      (def-value-at-cursor! inspector)
+      :c      (copy-value-at-cursor! inspector)
 
       nil)))
 
-(defn key-listener [inspector]
-  (proxy [KeyListener] []
-    (keyPressed [^KeyEvent e] (#'key-pressed inspector e))
-    (keyReleased [e])
-    (keyTyped [e])))
+(defn key-released [{:keys [^JFrame frame] :as inspector} e]
+  (condp = (:code e)
+    :space  (.setCursor frame (Cursor/DEFAULT_CURSOR))
+    nil))
 
 (defrecord Inspector [data-atom options-atom ui-atom frame])
 
@@ -660,7 +660,7 @@
       ui/add-absolute-coords))
 
 (defn- trigger-repaint [{::ui/keys [w h] :as new-ui} scale ^JPanel panel ^JFrame frame]
-  (.setPreferredSize panel (Dimension. (* scale w) (* scale h)))
+  (.setPreferredSize panel (Dimension. (+ 10 (* scale w)) (+ 10 (* scale h))))
   ;;(.revalidate panel)
   (.repaint frame))
 
@@ -671,6 +671,33 @@
 
 (defn- atom? [x]
   (instance? clojure.lang.Atom x)) ;;TODO make this more generic
+
+(defn- paint-scrollbars! [^JPanel panel ^JScrollPane sp ^Graphics2D g]
+  (let [vp  (.getViewport sp)
+        vw  (.getWidth vp)
+        vh  (.getHeight vp)
+
+        pw  (.getWidth panel)
+        ph  (.getHeight panel)
+
+        hor (-> sp .getHorizontalScrollBar .getValue)
+        ver (-> sp .getVerticalScrollBar .getValue)]
+    ;;horizonal scrollbar
+    (when (> pw vw)
+      (.fillRect g (* 2 hor) (+ vh ver -10) 10 10))
+
+    ;;vertical scrollbar
+    (when (> ph vh)
+      (let [x (- vw 10)
+            y (* 2 ver)
+            w 10
+            h (* vh (/ vh ph))]
+        (.fillRect g x y w h)))))
+
+(defn- scroll-to! [inspector [x y]]
+  (let [^JScrollPane sp (-> inspector :frame .getContentPane .getComponents first)]
+    (-> sp .getVerticalScrollBar (.setValue y))
+    (-> sp .getHorizontalScrollBar (.setValue x))))
 
 (defn inspector
   ([data]
@@ -700,11 +727,15 @@
                                    (.fillRect -2 -2
                                               (* (/ 1.0 scale) (+ 10 (.getWidth ^JPanel this)))
                                               (* (/ 1.0 scale) (+ 10 (.getHeight ^JPanel this)))))
-                                 (#'paint-cursor ui (::cursor @options-atom) g)
-                                 (ui/paint! ui g))
+                                 (#'paint-cursor! ui (::cursor @options-atom) g)
+                                 (ui/paint! ui g)
+                                 (.scale g 1 1)
+                                 (paint-scrollbars! this sp g))
                                (catch Exception e
                                  (.printStackTrace e)))))
          ^JScrollPane sp (reset! sp (doto (JScrollPane. panel)
+                                      (.setVerticalScrollBarPolicy JScrollPane/VERTICAL_SCROLLBAR_NEVER)
+                                      (.setHorizontalScrollBarPolicy JScrollPane/HORIZONTAL_SCROLLBAR_NEVER)
                                       ((fn [sp]
                                          (.setUnitIncrement (.getVerticalScrollBar ^JScrollPane sp) 16)
                                          (.setUnitIncrement (.getHorizontalScrollBar ^JScrollPane sp) 8)))))
@@ -718,29 +749,34 @@
                 (fn [_ _ _ data]
                   (let [{::keys [scale] :as options} @options-atom]
                     (cfuture
-                      (let [new-ui (make-new-ui data options)]
-                        (reset! ui-atom new-ui)
-                        (ui/later (trigger-repaint new-ui scale panel frame)))))))
+                     (let [new-ui (make-new-ui data options)]
+                       (reset! ui-atom new-ui)
+                       (ui/later (trigger-repaint new-ui scale panel frame)))))))
 
      (add-watch options-atom ::inspector-ui
                 (fn [_ _ old-options {::keys [scale] :as options}]
                   (cfuture
-                    (if (only-diff? old-options options ::cursor)
-                      (ui/later (trigger-repaint @ui-atom scale panel frame))
-                      (let [new-ui (make-new-ui @data-atom options)]
-                        (reset! ui-atom new-ui)
-                        (ui/later (trigger-repaint new-ui scale panel frame)))))))
+                   (if (only-diff? old-options options ::cursor)
+                     (ui/later (trigger-repaint @ui-atom scale panel frame))
+                     (let [new-ui (make-new-ui @data-atom options)]
+                       (reset! ui-atom new-ui)
+                       (ui/later (trigger-repaint new-ui scale panel frame)))))))
 
      ;;listeners
-     (doto panel
-       (.setBorder (BorderFactory/createEmptyBorder))
-       (.addMouseListener (mouse-listener inspector))
-       ;;(.addMouseMotionListener (mouse-position-printer))
-       )
-     (doto frame
-       (.setFocusTraversalKeysEnabled false) ;; so that <TAB> can be detected
-       (.addKeyListener (key-listener inspector))
-       (.setVisible true))
+     (let [{:keys [key-listener key-atom]}
+           (keys/key-listener {:pressed  (partial key-pressed inspector)
+                               :released (partial key-released inspector)})]
+       (doto frame
+         (.setFocusTraversalKeysEnabled false) ;; so that <TAB> can be detected
+         (.addKeyListener key-listener)
+         (.setVisible true))
+       (let [ml (mouse-listener inspector key-atom)]
+         (doto panel
+           (.setBorder (BorderFactory/createEmptyBorder))
+           (.addMouseListener ml)
+           (.addMouseMotionListener ml)
+           ;;(.addMouseMotionListener (mouse-position-printer))
+           )))
 
      (reset! last-inspector inspector)
 
