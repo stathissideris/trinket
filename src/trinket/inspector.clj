@@ -80,15 +80,31 @@
       (str/replace-first "(" "[")
       (str/replace #"\)$" "]")))
 
-(defn atom->ui [data {::ui/keys [text] :as attr ::keys [vector]} {::keys [cursor limit limits] :as options}]
+(defn- hidden-collection [x vector]
+  (cond vector   "[...]"
+        (map? x) "{...}"
+        (set? x) "#{...}"
+        :else    "(...)"))
+
+(defn atom->ui [data
+                {::ui/keys [text] :as attr ::keys [vector]}
+                {::keys [cursor limit limits hide-collections] :as options}]
   (ui/text
    (merge
     attr
-    {::ui/text  (if text text
-                    (binding [*print-length* (or (get limits cursor) limit)]
-                      (truncate (if vector
-                                  (pr-vector data)
-                                  (pr-str data)))))
+    {::ui/text  (cond text
+                      text
+
+                      (and hide-collections
+                           (not (string? data))
+                           (not (= :atom (collection-tag data))))
+                      (hidden-collection data vector)
+
+                      :else
+                      (binding [*print-length* (or (get limits cursor) limit)]
+                        (truncate (if vector
+                                    (pr-vector data)
+                                    (pr-str data)))))
      ::ui/color (cond (keyword? data) ui/color-keywords
                       (string? data)  ui/color-strings
                       :else           ui/color-text)
@@ -592,6 +608,8 @@
       :space  (.setCursor frame (Cursor/HAND_CURSOR))
       :tab    (expand-fn)
       :enter  (move-cursor! inspector :in)
+
+      :h      (swap-options! inspector update ::hide-collections not)
 
       :t      (swap-options! inspector update ::tables
                              (fn [tables]
