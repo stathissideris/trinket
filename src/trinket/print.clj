@@ -6,7 +6,7 @@
   (as-str [x budget]))
 
 (defn pr-str [x budget]
-  (let [[s char-left] (as-str x buf budget)]
+  (let [[s char-left] (as-str x budget)]
     (if (>= char-left 0)
       s
       (str s "..."))))
@@ -43,5 +43,5 @@
   clojure.lang.APersistentVector
   (as-str [x budget]) (pr-coll x budget "[" "]")
 
-  clojure.lang.IPersistentList
+  clojure.lang.ISeq
   (as-str [x budget] (pr-coll x budget "(" ")")))
