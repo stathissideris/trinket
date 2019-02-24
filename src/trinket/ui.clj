@@ -49,7 +49,7 @@
         (deliver promise# (do ~@exprs))))
      promise#))
 
-(defn point [x y]
+(defn ^Point point [x y]
   (Point. x y))
 
 (defmacro save-transform [g & body]

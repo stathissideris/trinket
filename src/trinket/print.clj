@@ -1,12 +1,17 @@
 (ns trinket.print
-  (:require [clojure.core :as c])
-  (:refer-clojure :exclude [pr-str]))
+  (:require [clojure.core :as c]))
+
+(defn hidden-collection [x vector]
+  (cond vector   "[...]"
+        (map? x) "{...}"
+        (set? x) "#{...}"
+        :else    "(...)"))
 
 (defprotocol AsString
-  (as-str [x budget]))
+  (as-str [x budget options]))
 
-(defn pr-str [x budget]
-  (let [[s char-left] (as-str x budget)]
+(defn pr-str-limit [x budget options]
+  (let [[s char-left] (as-str x budget options)]
     (if (>= char-left 0)
       s
       (str s "..."))))
@@ -25,7 +30,7 @@
                   [(.toString buffer) (dec budget)])
 
               :else
-              (let [[s new-budget] (as-str (first rem) budget)]
+              (let [[s new-budget] (as-str (first rem) budget {})]
                 (.append buffer s)
                 (let [n (next rem)]
                   (when (and n (> new-budget 0)) (.append buffer " "))
@@ -34,25 +39,33 @@
                                       new-budget)))))))))
 
 (defn- lazy-map [m]
-  (when m
-   (let [pair (first m)]
-     (lazy-seq (cons (key pair) (cons (val pair) (lazy-map (next m))))))))
+  (when (not-empty m)
+    (let [pair (first m)]
+      (lazy-seq (cons (key pair) (cons (val pair) (lazy-map (next m))))))))
 
 (extend-protocol AsString
+  nil
+  (as-str [_ budget _]
+    [(subs "nil" 0 (min budget 3))
+     (- budget 3)])
+
   Object
-  (as-str [x budget]
+  (as-str [x budget _]
     (let [s (c/pr-str x)]
       [(subs s 0 (min budget (.length s)))
        (- budget (.length s))]))
 
   clojure.lang.APersistentVector
-  (as-str [x budget] (pr-coll x budget "[" "]"))
+  (as-str [x budget _] (pr-coll x budget "[" "]"))
 
   clojure.lang.ISeq
-  (as-str [x budget] (pr-coll x budget "(" ")"))
+  (as-str [x budget {::keys [as-vector]}]
+    (if as-vector
+      (pr-coll x budget "[" "]")
+      (pr-coll x budget "(" ")")))
 
   clojure.lang.APersistentSet
-  (as-str [x budget] (pr-coll x budget "#{" "}"))
+  (as-str [x budget _] (pr-coll x budget "#{" "}"))
 
   clojure.lang.APersistentMap
-  (as-str [x budget] (pr-coll (lazy-map x) budget "{" "}")))
+  (as-str [x budget _] (pr-coll (lazy-map x) budget "{" "}")))

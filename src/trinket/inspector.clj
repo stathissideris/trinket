@@ -7,9 +7,8 @@
             [trinket.util :refer [cfuture]]
             [trinket.keys :as keys]
             [trinket.mouse :as mouse]
-            [clojure.pprint :as pp]
-            [clojure.string :as str]
-            [clojure.zip :as zip])
+            [trinket.print :as print]
+            [clojure.string :as str])
   (:import [java.awt Toolkit Graphics2D Dimension Cursor]
            [java.awt.event KeyListener KeyEvent MouseListener MouseMotionListener MouseEvent MouseWheelEvent]
            [java.awt.datatransfer StringSelection]
@@ -70,22 +69,6 @@
 (defn- indicate-lazy [ui]
   (ui/horizontal {::ui/children [(annotation "L") ui]}))
 
-(defn- truncate [^String s]
-  (if (> (.length s) 100)
-    (str (subs s 0 100) "...")
-    s))
-
-(defn pr-vector [x]
-  (-> x pr-str
-      (str/replace-first "(" "[")
-      (str/replace #"\)$" "]")))
-
-(defn- hidden-collection [x vector]
-  (cond vector   "[...]"
-        (map? x) "{...}"
-        (set? x) "#{...}"
-        :else    "(...)"))
-
 (defn atom->ui [data
                 {::ui/keys [text] :as attr ::keys [vector]}
                 {::keys [cursor limit limits hide-collections] :as options}]
@@ -98,13 +81,10 @@
                       (and hide-collections
                            (not (string? data))
                            (not (= :atom (collection-tag data))))
-                      (hidden-collection data vector)
+                      (print/hidden-collection data vector)
 
                       :else
-                      (binding [*print-length* (or (get limits cursor) limit)]
-                        (truncate (if vector
-                                    (pr-vector data)
-                                    (pr-str data)))))
+                      (print/pr-str-limit data 100 {::print/as-vector vector}))
      ::ui/color (cond (keyword? data) ui/color-keywords
                       (string? data)  ui/color-strings
                       :else           ui/color-text)
@@ -695,14 +675,14 @@
             y (+ ver (* vh (/ ver ph)))]
         (.fillRect g x y w h)))))
 
-(defn- scroll-to! [{:keys [frame] :as inspector} [x y]]
-  (let [vp (-> frame .getContentPane .getComponents first .getViewport)]
+(defn- scroll-to! [{:keys [^JFrame frame] :as inspector} [x y]]
+  (let [^javax.swing.JViewport vp (-> frame .getContentPane .getComponents first .getViewport)]
     (.setViewPosition vp (ui/point (max 0 x) (max 0 y)))
     (.repaint frame)))
 
-(defn- scroll-by! [{:keys [frame] :as inspector} [dx dy]]
-  (let [vp (-> frame .getContentPane .getComponents first .getViewport)
-        p  (.getViewPosition vp)
+(defn- scroll-by! [{:keys [^JFrame frame] :as inspector} [dx dy]]
+  (let [^javax.swing.JViewport vp (-> frame .getContentPane .getComponents first .getViewport)
+        ^java.awt.Point p (.getViewPosition vp)
         cx (.getX p)
         cy (.getY p)]
     (.setViewPosition vp (ui/point (max 0 (+ cx dx)) (max 0 (+ cy dy))))
