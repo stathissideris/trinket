@@ -16,7 +16,7 @@
     ["" -1]
     (let [buffer (StringBuffer. opening)]
       (loop [rem    x
-             budget (dec budget)]
+             budget (- budget (.length opening))]
         (cond (<= budget 0)
               [(.toString buffer) (dec budget)]
 
@@ -41,7 +41,10 @@
        (- budget (.length s))]))
 
   clojure.lang.APersistentVector
-  (as-str [x budget]) (pr-coll x budget "[" "]")
+  (as-str [x budget] (pr-coll x budget "[" "]"))
 
   clojure.lang.ISeq
-  (as-str [x budget] (pr-coll x budget "(" ")")))
+  (as-str [x budget] (pr-coll x budget "(" ")"))
+
+  clojure.lang.APersistentSet
+  (as-str [x budget] (pr-coll x budget "#{" "}")))
