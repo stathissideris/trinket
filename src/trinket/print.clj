@@ -33,6 +33,11 @@
                                       (dec new-budget)
                                       new-budget)))))))))
 
+(defn- lazy-map [m]
+  (when m
+   (let [pair (first m)]
+     (lazy-seq (cons (key pair) (cons (val pair) (lazy-map (next m))))))))
+
 (extend-protocol AsString
   Object
   (as-str [x budget]
@@ -47,4 +52,7 @@
   (as-str [x budget] (pr-coll x budget "(" ")"))
 
   clojure.lang.APersistentSet
-  (as-str [x budget] (pr-coll x budget "#{" "}")))
+  (as-str [x budget] (pr-coll x budget "#{" "}"))
+
+  clojure.lang.APersistentMap
+  (as-str [x budget] (pr-coll (lazy-map x) budget "{" "}")))
