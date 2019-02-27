@@ -1,5 +1,6 @@
 (ns trinket.keys
   (:require [clojure.string :as str]
+            [clojure.reflect]
             [trinket.os :as os])
   (:import [java.awt.event KeyListener KeyEvent]))
 
