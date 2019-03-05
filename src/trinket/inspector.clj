@@ -156,7 +156,8 @@
             (assoc ::path path ::click-path path))
         (when aliases (aliases-panel aliases))
         (ui/grid
-         {::ui/children
+         {::ui/column-padding 10
+          ::ui/children
           (vec
            (concat
             ;;header

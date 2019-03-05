@@ -139,7 +139,7 @@ or
 - [ ] BUG: Top-level empty maps render as invisible
 
 - [ ] BUG: <kbd>d</kbd> doesn't work as expected in table cells
-- [ ] reinstate grid padding
+- [x] reinstate grid padding
 - [ ] Test slow lazy sequences
 - [ ] BUG: don't scroll down from last element of list of maps if
       there is nothing to scroll to

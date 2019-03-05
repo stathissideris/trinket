@@ -256,8 +256,9 @@
                                      (map #(-> % (nth-child col) (get ::w 0)))
                                      safe-max))
                               (range col-count))
-          total-width   (reduce + column-widths)
-          x-positions   (vec (reductions + 0 column-widths))
+          total-width   (+ (reduce + column-widths)
+                           (* column-padding (dec col-count)))
+          x-positions   (vec (reductions (partial + column-padding) 0 column-widths))
           row-heights   (mapv row-height rows)
           y-positions   (vec (reductions + 0 row-heights))]
 
