@@ -189,6 +189,9 @@
         (and (get tables path) (tabular-data? data))
         (data-table data attr options)
 
+        (empty? data)
+        (ui/text (str opening closing))
+
         :else
         (let [last-idx (dec (count data))]
           (ui/vertical
@@ -301,56 +304,61 @@
 
 (defmethod data->ui :map
   [data {::keys [path] :as attr} {::keys [expanded] :as options}]
-  (if-not (get expanded path)
-    (atom->ui data attr options)
-    (let [last-idx (dec (count data))
-          prefixed  (prefixed-map? data)]
-      (ui/vertical
-       (merge
-        attr
-        {::tag         (collection-tag data)
-         ::path        path
-         ::ui/children
-         [(when prefixed (ui/text {::ui/text    (str "#:" (namespace (ffirst data)))
-                                   ::click-path path}))
-          (ui/grid
-           {::ui/class    "main-map-grid"
-            ::ui/children
-            (for [[idx [k v]] (map-indexed vector data)]
-              (let [key-path (conj path idx ::path/key)
-                    val-path (conj path idx ::path/val)]
-                (ui/row
-                 {::ui/children
-                  [ ;;opening
-                   (if (zero? idx)
-                     (-> (ui/text "{")
-                         (merge {::click-path path ::ui/class "opening-brace"})) ;;assoc path to allow mouse selection of whole map
-                     (ui/text " "))
+  (cond (not (get expanded path))
+        (atom->ui data attr options)
 
-                   ;;key
-                   (if (get expanded key-path)
-                     (-> (data->ui k {::path key-path} options)
-                         (assoc-bounds idx last-idx)
-                         (merge {::ui/class "map-key"}))
-                     (let [k-text (if prefixed
-                                    (str ":" (name k))
-                                    (pr-str k))]
-                       (-> (data->ui k {::path key-path} options)
+        (empty? data)
+        (ui/text "{}")
+
+        :else
+        (let [last-idx (dec (count data))
+              prefixed  (prefixed-map? data)]
+          (ui/vertical
+           (merge
+            attr
+            {::tag         (collection-tag data)
+             ::path        path
+             ::ui/children
+             [(when prefixed (ui/text {::ui/text    (str "#:" (namespace (ffirst data)))
+                                       ::click-path path}))
+              (ui/grid
+               {::ui/class    "main-map-grid"
+                ::ui/children
+                (for [[idx [k v]] (map-indexed vector data)]
+                  (let [key-path (conj path idx ::path/key)
+                        val-path (conj path idx ::path/val)]
+                    (ui/row
+                     {::ui/children
+                      [ ;;opening
+                       (if (zero? idx)
+                         (-> (ui/text "{")
+                             (merge {::click-path path ::ui/class "opening-brace"})) ;;assoc path to allow mouse selection of whole map
+                         (ui/text " "))
+
+                       ;;key
+                       (if (get expanded key-path)
+                         (-> (data->ui k {::path key-path} options)
+                             (assoc-bounds idx last-idx)
+                             (merge {::ui/class "map-key"}))
+                         (let [k-text (if prefixed
+                                        (str ":" (name k))
+                                        (pr-str k))]
+                           (-> (data->ui k {::path key-path} options)
+                               (assoc-bounds idx last-idx)
+                               (merge {::ui/text k-text ::ui/class "map-key" ::click-path key-path}))))
+
+                       (ui/text " ")
+
+                       ;;value
+                       (-> (data->ui v {::path val-path} options)
                            (assoc-bounds idx last-idx)
-                           (merge {::ui/text k-text ::ui/class "map-key" ::click-path key-path}))))
+                           (merge {::ui/class "map-value" ::click-path val-path}))
 
-                   (ui/text " ")
-
-                   ;;value
-                   (-> (data->ui v {::path val-path} options)
-                       (assoc-bounds idx last-idx)
-                       (merge {::ui/class "map-value" ::click-path val-path}))
-
-                   ;; closing
-                   (if (= idx last-idx)
-                     (-> (ui/text "}")
-                         (merge {::click-path path ::ui/alignment "sw" ::ui/class "closing-brace"}))
-                     (ui/text " "))]})))})]})))))
+                       ;; closing
+                       (if (= idx last-idx)
+                         (-> (ui/text "}")
+                             (merge {::click-path path ::ui/alignment "sw" ::ui/class "closing-brace"}))
+                         (ui/text " "))]})))})]})))))
 
 (defn paint-cursor [ui path ^Graphics2D g]
   (when-let [match (ui/find-component ui #(= path (::path %)))]
