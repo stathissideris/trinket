@@ -105,11 +105,11 @@
          (when (= idx last-idx) {::last true})))
 
 (defn- table-row [data
-                  {::keys [row-idx path offset total-keys]
-                   :or    {offset 0}}
+                  {::keys [row-idx path offset total-keys]}
                   {::keys [show-indexes]
                    :as    options}]
-  (let [last-col-idx (dec (count data))]
+  (let [offset       (or offset 0)
+        last-col-idx (dec (count data))]
     (ui/row
      {::path        (conj path (+ row-idx offset))
       ::table-row   true
@@ -154,7 +154,8 @@
             (assoc ::path path ::click-path path))
         (when aliases (aliases-panel aliases))
         (ui/grid
-         {::ui/children
+         {::ui/column-padding 10
+          ::ui/children
           (vec
            (concat
             ;;header
