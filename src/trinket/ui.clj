@@ -264,7 +264,7 @@
 
       (as-> this $
         (assoc $
-               ::w (apply + column-widths)
+               ::w total-width
                ::h (apply + row-heights))
 
         ;;position the cells
