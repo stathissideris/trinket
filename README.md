@@ -146,7 +146,7 @@ or
       1 in maps (unable to reproduce)
 - [x] BUG: collapsed vectors rendered with `(...)`
 - [ ] Make coll scrolling and show less/more forgiving so that it
-      scrolls parent if element of collection is highlighted.
+      scrolls to parent if element of collection is highlighted.
 
 ## REPL workflows
 
