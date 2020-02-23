@@ -136,8 +136,7 @@ or
 - [ ] barchart
 - [ ] show aliases on mixed single maps
 - [ ] turn aliases on and off
-- [ ] BUG: Top-level empty maps render as invisible
-
+- [x] BUG: Top-level empty maps render as invisible
 - [ ] BUG: <kbd>d</kbd> doesn't work as expected in table cells
 - [x] reinstate grid padding
 - [ ] Test slow lazy sequences
@@ -147,7 +146,7 @@ or
       1 in maps (unable to reproduce)
 - [x] BUG: collapsed vectors rendered with `(...)`
 - [ ] Make coll scrolling and show less/more forgiving so that it
-      scrolls parent if element of collection is highlighted.
+      scrolls to parent if element of collection is highlighted.
 
 ## REPL workflows
 
