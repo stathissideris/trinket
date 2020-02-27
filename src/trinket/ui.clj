@@ -1,7 +1,7 @@
 (ns trinket.ui
   (:require [clojure.zip :as zip]
             ;;[trinket.perf :as perf]
-            )
+            [clojure.core.async :as a])
   (:import [java.awt Graphics2D Color Font Rectangle RenderingHints GraphicsEnvironment]
            [javax.swing SwingUtilities JComponent JLabel]
            [java.awt Point]))
@@ -379,3 +379,43 @@
                (zip/replace loc)
                zip/next
                recur))))))
+
+(def event-state
+  (atom
+   {:chan      nil
+    :listeners nil}))
+
+(defn start! []
+  (when-not (:chan @event-state)
+    (let [chan (a/chan 128)]
+      (swap! event-state assoc :chan chan)
+      (future
+        (loop []
+          (if-let [event (a/<!! chan)]
+            (do
+             (doseq [{:keys [key pred callback]} (-> @event-state :listeners vals)]
+               (when (pred event) (callback event)))
+             (recur))
+            (reset! event-state nil)))))))
+
+(defn stop! []
+  (a/close! (:chan @event-state)))
+
+(defn add-listener! [{:keys [key] :as listener}]
+  (swap! event-state update :listeners assoc key listener))
+
+(defn dispatch! [event]
+  (a/>!! (:chan @event-state) event))
+
+(comment
+  (do
+    (start!)
+    (add-listener! {:key :all :pred any? :callback (fn [event] (prn event))})
+    (add-listener! {:key :more10 :pred (fn [{:keys [x]}] (when x (> x 10))) :callback (fn [event] (prn "MORE THAN 10" event))}))
+
+  (dispatch! {:source "fooxxx133"})
+  (dispatch! {:source "fooxxx133" :x 8})
+  (dispatch! {:source "fooxxx133" :x 14})
+
+  (stop!)
+  )
